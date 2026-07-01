@@ -1,6 +1,6 @@
 {
-  "name": "SM1 - HBC BISCHO",
-  "short_name": "SM1 BISCHO",
+  "name": "LustuZone",
+  "short_name": "LustuZone",
   "description": "Suivi de la caisse noire de l'équipe SM1 26-27",
   "start_url": "./index.html",
   "scope": "./",

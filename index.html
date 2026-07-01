@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#0c0e16" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="SM1 BISCHO" />
+<meta name="apple-mobile-web-app-title" content="LustuZone" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
-<title>SM1 - HBC BISCHO</title>
+<title>LustuZone</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -21,7 +21,7 @@
     --glow: radial-gradient(circle, rgba(47,107,255,0.35), transparent 70%);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: #07080d; }
+  html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; }
   body { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif; color: #e8e8ee; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
   #app { max-width: 100%; padding: 12px; }
   .header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-top: env(safe-area-inset-top); }
@@ -129,6 +129,7 @@
   .ev-type.match { background: rgba(47,107,255,0.15); color: var(--accent); }
   .ev-type.entrainement { background: rgba(120,200,80,0.15); color: #78c850; }
   .ev-type.repas { background: rgba(255,180,60,0.15); color: #ffb43c; }
+  .ev-type.benevole { background: rgba(255,120,73,0.15); color: #ff7849; }
   .ev-type.autre { background: rgba(154,166,196,0.15); color: #9aa6c4; }
   .ev-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
   .ev-date-full { font-size: 12px; color: #d7dcec; font-weight: 700; margin-bottom: 3px; text-transform: capitalize; }
@@ -158,6 +159,9 @@
   @media (min-width: 420px) {
     .add-form-row > div { flex: 1 1 0; }
   }
+  .date-select-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .date-select-row select { flex: 1; min-width: 0; padding: 9px 2px; text-align: center; font-size: 13px; }
+  .expand-toggle { text-align: center; padding: 8px; font-size: 11px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; cursor: pointer; }
   .add-toggle { width: 100%; padding: 11px; border-radius: 12px; border: 1px dashed #2f3a52; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; cursor: pointer; font-family: 'Archivo', sans-serif; }
 </style>
 </head>
@@ -203,7 +207,7 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-01-8"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-01-9"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -380,7 +384,7 @@ async function generateSeasonTrainingsApi() {
   const start = formatDateKey(SEASON_START);
   const end = formatDateKey(SEASON_END);
   try {
-    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=generateSeasonTrainings&start=${start}&end=${end}&heure=20:00&lieu=${encodeURIComponent("Lustucru Arena")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=generateSeasonTrainings&start=${start}&end=${end}&heureMardi=20:00&heureJeudi=20:15&lieu=${encodeURIComponent("Lustucru Arena")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     const data = await res.json();
     await fetchAll();
     alert(data.ok ? `${data.created} entraînement(s) ajouté(s) à l'agenda.` : "Une erreur est survenue.");
@@ -493,6 +497,67 @@ function fmt(n) {
 
 function formatDateKey(d) {
   return d.toISOString().slice(0, 10);
+}
+
+// ---------- Sélecteurs Date/Heure compacts (remplacent les <input type=date/time>
+// natifs, dont le rendu déborde sur certains téléphones) ----------
+const MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+function dateSelectHtml(prefix, isoDate) {
+  let day = "", month = "", year = new Date().getFullYear();
+  if (isoDate) {
+    const [y, m, d] = isoDate.split("-");
+    year = parseInt(y, 10); month = parseInt(m, 10); day = parseInt(d, 10);
+  }
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const years = [SEASON_START.getFullYear(), SEASON_START.getFullYear() + 1, SEASON_START.getFullYear() + 2];
+  return `<div class="date-select-row">
+    <select id="${prefix}-day">
+      <option value="">Jour</option>
+      ${days.map(d => `<option value="${String(d).padStart(2, "0")}" ${d === day ? "selected" : ""}>${d}</option>`).join("")}
+    </select>
+    <select id="${prefix}-month">
+      <option value="">Mois</option>
+      ${MONTHS_FR.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}" ${(i + 1) === month ? "selected" : ""}>${m}</option>`).join("")}
+    </select>
+    <select id="${prefix}-year">
+      ${years.map(y => `<option value="${y}" ${y === year ? "selected" : ""}>${y}</option>`).join("")}
+    </select>
+  </div>`;
+}
+
+function heureSelectHtml(prefix, isoHeure) {
+  let h = "", m = "00";
+  if (isoHeure) {
+    const [hh, mm] = isoHeure.split(":");
+    h = parseInt(hh, 10); m = mm;
+  }
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = ["00", "15", "30", "45"];
+  return `<div class="date-select-row">
+    <select id="${prefix}-h">
+      <option value="">Heure</option>
+      ${hours.map(v => `<option value="${String(v).padStart(2, "0")}" ${v === h ? "selected" : ""}>${String(v).padStart(2, "0")}h</option>`).join("")}
+    </select>
+    <select id="${prefix}-m">
+      ${minutes.map(v => `<option value="${v}" ${v === m ? "selected" : ""}>${v}</option>`).join("")}
+    </select>
+  </div>`;
+}
+
+function readDateSelect(prefix) {
+  const day = document.getElementById(`${prefix}-day`).value;
+  const month = document.getElementById(`${prefix}-month`).value;
+  const year = document.getElementById(`${prefix}-year`).value;
+  if (!day || !month || !year) return "";
+  return `${year}-${month}-${day}`;
+}
+
+function readHeureSelect(prefix) {
+  const h = document.getElementById(`${prefix}-h`).value;
+  const m = document.getElementById(`${prefix}-m`).value;
+  if (!h) return "";
+  return `${h}:${m}`;
 }
 
 function formatDateFr(d) {
@@ -631,10 +696,11 @@ function render() {
   // les effacer lors du rafraîchissement automatique toutes les 8 secondes
   const fieldValues = {};
   app.querySelectorAll("input[id], select[id], textarea[id]").forEach(el => {
+    if (el.id === "nav-extra") return; // contrôle de navigation, jamais à restaurer
     fieldValues[el.id] = el.value;
   });
   const active = document.activeElement;
-  const activeId = active && active.id ? active.id : null;
+  const activeId = active && active.id && active.id !== "nav-extra" ? active.id : null;
   const activeSelStart = active && typeof active.selectionStart === "number" ? active.selectionStart : null;
   const activeSelEnd = active && typeof active.selectionEnd === "number" ? active.selectionEnd : null;
 
@@ -646,7 +712,7 @@ function render() {
 
   let html = `<div class="header">
     <img src="${LOGO_DATA_URI}" alt="Logo HBC Bischoffsheim"/>
-    <div><div class="title">SM1 - HBC BISCHO</div><div class="subtitle">App de Gestion</div></div>
+    <div><div class="title">LustuZone</div><div class="subtitle">App de Gestion</div></div>
     <div class="spacer"></div>
     <div style="text-align:right;">
       <div class="muted" style="margin-bottom:2px;">${session.nom} <span class="badge">${session.role}</span></div>
@@ -762,7 +828,7 @@ function renderLogin() {
 
   return `<div class="login-wrap"><div class="login-card">
     <img src="${LOGO_DATA_URI}" alt="Logo"/>
-    <div style="font-weight:bold; font-size:16px; margin-bottom:4px;">SM1 - HBC BISCHO</div>
+    <div style="font-weight:bold; font-size:16px; margin-bottom:4px;">LustuZone</div>
     <div class="muted">App de Gestion</div>
     <label class="field-label">Ton nom</label>
     <select id="login-nom">
@@ -804,6 +870,70 @@ function attachLoginEvents() {
   };
 }
 
+function computeSeasonAverages() {
+  return PLAYERS.map(p => {
+    let oui = 0, total = 0;
+    evenements.forEach(ev => {
+      const v = presenceEvenements[`${ev[0]}_${p}`];
+      if (v === "Oui" || v === "Non") {
+        total++;
+        if (v === "Oui") oui++;
+      }
+    });
+    return { p, pct: total > 0 ? (oui / total) * 100 : null, oui, total };
+  }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+}
+
+function renderEventRosterSection(ev, canManage) {
+  const id = ev[0];
+  let html = `<div class="card">
+    <div class="section-h" style="margin-bottom:8px;">Pointage - ${ev[4] || "Événement"}</div>`;
+
+  if (canManage) {
+    const roster = PLAYERS.map(p => ({ p, val: presenceEvenements[`${id}_${p}`] }));
+    const expanded = !!window.__nextRosterExpanded;
+    const visibleRoster = expanded ? roster : roster.slice(0, 5);
+    visibleRoster.forEach(r => {
+      const color = r.val === "Oui" ? "#33d17a" : (r.val === "Non" ? "#ff5a5a" : "#5a6b8c");
+      const label = r.val === "Oui" ? "Présent" : (r.val === "Non" ? "Absent" : "En attente");
+      html += `<div class="presence-row"><div>${r.p}</div><div style="color:${color}; font-weight:700; font-size:12px;">${label}</div></div>`;
+    });
+    if (roster.length > 5) {
+      html += `<div class="expand-toggle" data-toggle-next-roster="1">${expanded ? "Réduire ▲" : `Voir les ${roster.length - 5} autres ▾`}</div>`;
+    }
+  } else {
+    const val = presenceEvenements[`${id}_${session.nom}`];
+    const color = val === "Oui" ? "#33d17a" : (val === "Non" ? "#ff5a5a" : "#5a6b8c");
+    const label = val === "Oui" ? "Présent" : (val === "Non" ? "Absent" : "Pas encore répondu");
+    html += `<div class="presence-row"><div>Toi</div><div style="color:${color}; font-weight:700; font-size:12px;">${label}</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderSeasonAverageCard() {
+  const stats = computeSeasonAverages();
+  const expanded = !!window.__seasonAvgExpanded;
+  const visible = expanded ? stats : stats.slice(0, 5);
+  let html = `<div class="card">
+    <div class="section-h" style="margin-bottom:8px;">Moyenne de présence - saison</div>`;
+  if (stats.every(s => s.pct === null)) {
+    html += `<div class="muted">Pas encore de données de présence.</div>`;
+  } else {
+    visible.forEach(s => {
+      const label = s.pct === null ? "Pas de donnée" : `${fmt(s.pct)} %`;
+      const color = s.pct === null ? "#5a6b8c" : (s.pct >= 75 ? "#33d17a" : (s.pct >= 50 ? "#ffb43c" : "#ff5a5a"));
+      html += `<div class="presence-row"><div>${s.p}</div><div style="color:${color}; font-weight:700; font-size:12px;">${label}</div></div>`;
+    });
+    if (stats.length > 5) {
+      html += `<div class="expand-toggle" data-toggle-season-avg="1">${expanded ? "Réduire ▲" : `Voir les ${stats.length - 5} autres ▾`}</div>`;
+    }
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderHome() {
   const isPlayerLike = PLAYERS.includes(session.nom) || session.role === "Admin";
   const canManage = session.role === "Coach" || session.role === "Admin";
@@ -811,6 +941,11 @@ function renderHome() {
 
   const nextEv = nextEvenement();
   html += renderNextEventCard();
+
+  if (nextEv && session.role !== "Bénévole") {
+    html += renderEventRosterSection(nextEv, canManage);
+    html += renderSeasonAverageCard();
+  }
 
   const weekEvents = getCurrentWeekEvents().filter(ev => !nextEv || ev[0] !== nextEv[0]);
   html += `<div class="section-h">Cette semaine</div>`;
@@ -864,7 +999,24 @@ function typeClass(type) {
   if (t.includes("match")) return "match";
   if (t.includes("entra")) return "entrainement";
   if (t.includes("repas")) return "repas";
+  if (t.includes("benevole") || t.includes("bénévole")) return "benevole";
   return "autre";
+}
+
+function isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+function eventGroupLabel(ev) {
+  const t = ev[3] || "Autre";
+  if (typeClass(t) === "entrainement") {
+    return `Entraînement semaine ${isoWeekNumber(eventDateObj(ev))}`;
+  }
+  return t;
 }
 
 function renderNextEventCard() {
@@ -901,15 +1053,16 @@ function renderAgenda() {
     html += `<button class="add-toggle" id="toggle-add-event">${showAddEvent ? "− Fermer" : "+ Ajouter un événement"}</button>`;
     if (showAddEvent) {
       html += `<div class="add-form">
-        <div class="add-form-row">
-          <div><label class="field-label">Date</label><input id="ev-date" type="date" /></div>
-          <div><label class="field-label">Heure</label><input id="ev-heure" type="time" /></div>
-        </div>
+        <label class="field-label">Date</label>
+        ${dateSelectHtml("ev-date", "")}
+        <label class="field-label">Heure</label>
+        ${heureSelectHtml("ev-heure", "")}
         <label class="field-label">Type</label>
         <select id="ev-type">
           <option value="Match">Match</option>
           <option value="Entraînement">Entraînement</option>
           <option value="Repas">Repas</option>
+          <option value="Bénévole">Bénévole</option>
           <option value="Autre">Autre</option>
         </select>
         <label class="field-label">Titre</label>
@@ -926,11 +1079,18 @@ function renderAgenda() {
   const upcoming = sorted.filter(ev => eventDateObj(ev) >= now);
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
 
-  html += `<div class="section-h">À venir</div>`;
   if (upcoming.length === 0) {
-    html += `<div class="card muted">Aucun événement à venir pour le moment.</div>`;
+    html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir pour le moment.</div>`;
   } else {
-    upcoming.forEach(ev => { html += renderEventCard(ev, canManage); });
+    let lastLabel = null;
+    upcoming.forEach(ev => {
+      const label = eventGroupLabel(ev);
+      if (label !== lastLabel) {
+        html += `<div class="section-h">${label}</div>`;
+        lastLabel = label;
+      }
+      html += renderEventCard(ev, canManage);
+    });
   }
 
   if (past.length > 0) {
@@ -962,13 +1122,13 @@ function renderEventCard(ev, canManage, isPast) {
 
   if (canManage && window.__editingEvenementId === id) {
     return `<div class="ev-card" style="display:block;">
-      <div class="add-form-row">
-        <div><label class="field-label">Date</label><input id="edit-ev-date-${id}" type="date" value="${date || ''}" /></div>
-        <div><label class="field-label">Heure</label><input id="edit-ev-heure-${id}" type="time" value="${heure || ''}" /></div>
-      </div>
+      <label class="field-label">Date</label>
+      ${dateSelectHtml(`edit-ev-date-${id}`, date || "")}
+      <label class="field-label">Heure</label>
+      ${heureSelectHtml(`edit-ev-heure-${id}`, heure || "")}
       <label class="field-label">Type</label>
       <select id="edit-ev-type-${id}">
-        ${["Match", "Entraînement", "Repas", "Autre"].map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${t}</option>`).join("")}
+        ${["Match", "Entraînement", "Repas", "Bénévole", "Autre"].map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${t}</option>`).join("")}
       </select>
       <label class="field-label">Titre</label>
       <input id="edit-ev-titre-${id}" type="text" value="${titre || ''}" />
@@ -1089,12 +1249,12 @@ function renderPresencePage() {
   if (upcoming.length === 0) {
     html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir.</div>`;
   } else {
-    let lastType = null;
+    let lastLabel = null;
     upcoming.forEach(ev => {
-      const t = ev[3] || "Autre";
-      if (t !== lastType) {
-        html += `<div class="section-h">${t}</div>`;
-        lastType = t;
+      const label = eventGroupLabel(ev);
+      if (label !== lastLabel) {
+        html += `<div class="section-h">${label}</div>`;
+        lastLabel = label;
       }
       html += renderPresenceEventCard(ev, false);
     });
@@ -1207,7 +1367,7 @@ function vibrate() {
 
 // Retour visuel immédiat au toucher, indépendant du rafraîchissement de la page
 // (le CSS :active seul n'a pas toujours le temps de s'afficher avant le re-rendu)
-const TAP_SELECTOR = ".btn, .nav-btn, .toggle-btn, .ev-edit, .ev-del, .bottom-nav button";
+const TAP_SELECTOR = ".btn, .nav-btn, .toggle-btn, .ev-edit, .ev-del, .bottom-nav button, .expand-toggle";
 document.addEventListener("touchstart", (e) => {
   const el = e.target.closest(TAP_SELECTOR);
   if (el) el.classList.add("tap-active");
@@ -1255,14 +1415,26 @@ function attachEvents() {
     };
   });
 
+  const toggleNextRoster = document.querySelector("[data-toggle-next-roster]");
+  if (toggleNextRoster) toggleNextRoster.onclick = () => {
+    window.__nextRosterExpanded = !window.__nextRosterExpanded;
+    render();
+  };
+
+  const toggleSeasonAvg = document.querySelector("[data-toggle-season-avg]");
+  if (toggleSeasonAvg) toggleSeasonAvg.onclick = () => {
+    window.__seasonAvgExpanded = !window.__seasonAvgExpanded;
+    render();
+  };
+
   const submitAddEvent = document.getElementById("submit-add-event");
   if (submitAddEvent) submitAddEvent.onclick = () => {
-    const date = document.getElementById("ev-date").value;
-    const heure = document.getElementById("ev-heure").value;
+    const date = readDateSelect("ev-date");
+    const heure = readHeureSelect("ev-heure");
     const type = document.getElementById("ev-type").value;
     const titre = document.getElementById("ev-titre").value;
     const lieu = document.getElementById("ev-lieu").value;
-    if (!date || !titre) return;
+    if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
     addEvenementApi(date, heure, type, titre, lieu);
   };
 
@@ -1284,12 +1456,12 @@ function attachEvents() {
   document.querySelectorAll("[data-save-event]").forEach(el => {
     el.onclick = () => {
       const id = el.dataset.saveEvent;
-      const date = document.getElementById(`edit-ev-date-${id}`).value;
-      const heure = document.getElementById(`edit-ev-heure-${id}`).value;
+      const date = readDateSelect(`edit-ev-date-${id}`);
+      const heure = readHeureSelect(`edit-ev-heure-${id}`);
       const type = document.getElementById(`edit-ev-type-${id}`).value;
       const titre = document.getElementById(`edit-ev-titre-${id}`).value;
       const lieu = document.getElementById(`edit-ev-lieu-${id}`).value;
-      if (!date || !titre) return;
+      if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
       updateEvenementApi(id, date, heure, type, titre, lieu);
     };
   });
