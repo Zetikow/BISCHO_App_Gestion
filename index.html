@@ -200,7 +200,7 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-01-2"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-01-4"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -377,7 +377,7 @@ async function generateSeasonTrainingsApi() {
   const start = formatDateKey(SEASON_START);
   const end = formatDateKey(SEASON_END);
   try {
-    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=generateSeasonTrainings&start=${start}&end=${end}&heure=20:00&lieu=${encodeURIComponent("Gymnase Leclerc")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=generateSeasonTrainings&start=${start}&end=${end}&heure=20:00&lieu=${encodeURIComponent("Lustucru Arena")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     const data = await res.json();
     await fetchAll();
     alert(data.ok ? `${data.created} entraînement(s) ajouté(s) à l'agenda.` : "Une erreur est survenue.");
@@ -565,6 +565,22 @@ function sortedEvenements() {
 function nextEvenement() {
   const now = new Date();
   return sortedEvenements().find(ev => eventDateObj(ev) >= now) || null;
+}
+
+function getCurrentWeekEvents() {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return sortedEvenements().filter(ev => {
+    const d = eventDateObj(ev);
+    return d >= monday && d <= sunday;
+  });
 }
 
 function formatEventDateFr(ev) {
@@ -761,9 +777,20 @@ function attachLoginEvents() {
 
 function renderHome() {
   const isPlayerLike = PLAYERS.includes(session.nom) || session.role === "Admin";
+  const canManage = session.role === "Coach" || session.role === "Admin";
   let html = "";
 
+  const nextEv = nextEvenement();
   html += renderNextEventCard();
+
+  const weekEvents = getCurrentWeekEvents().filter(ev => !nextEv || ev[0] !== nextEv[0]);
+  if (weekEvents.length > 0) {
+    html += `<div class="section-h">Cette semaine</div>`;
+    weekEvents.forEach(ev => {
+      const isPast = eventDateObj(ev) < new Date();
+      html += renderEventCard(ev, canManage, isPast);
+    });
+  }
 
   if (PLAYERS.includes(session.nom)) {
     const total = playerTotal(session.nom);
@@ -854,7 +881,7 @@ function renderAgenda() {
         <label class="field-label">Titre</label>
         <input id="ev-titre" type="text" placeholder="ex: Bischo vs Illkirch" />
         <label class="field-label">Lieu</label>
-        <input id="ev-lieu" type="text" placeholder="ex: Gymnase Leclerc" />
+        <input id="ev-lieu" type="text" value="Lustucru Arena" />
         <button class="btn" id="submit-add-event" style="margin-top:4px;">Enregistrer l'événement</button>
       </div>`;
     }
