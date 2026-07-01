@@ -35,7 +35,7 @@
   .bottom-nav { position: fixed; bottom: 10px; left: 10px; right: 10px; background: #11141f; border: 1px solid #1c2333; border-radius: 22px; display: flex; padding: 10px 6px calc(10px + env(safe-area-inset-bottom)); z-index: 50; box-shadow: 0 8px 30px rgba(0,0,0,0.45); }
   .bottom-nav button, .bottom-nav .bn-select-wrap { flex: 1; min-width: 0; }
   .bottom-nav button { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: #5a6b8c; font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; padding: 6px 2px; cursor: pointer; transition: transform 0.12s, color 0.15s; }
-  .bottom-nav button:active { transform: scale(0.9); }
+  .bottom-nav button:active, .bottom-nav button.tap-active { transform: scale(0.9); }
   .bottom-nav button.active { color: var(--accent); }
   .bottom-nav button.active svg { filter: drop-shadow(0 0 6px rgba(47,107,255,0.6)); }
   .bottom-nav svg { width: 24px; height: 24px; }
@@ -66,7 +66,7 @@
   .pill { display: inline-block; padding: 6px 12px; border-radius: 20px; background: #1a1f30; color: #ff8a5c; font-size: 11px; margin: 3px; border: 1px solid #2a2340; font-weight: 600; }
 
   .btn { padding: 12px 14px; border-radius: 12px; border: none; background: var(--grad); color: #fff; cursor: pointer; font-size: 13px; font-weight: 800; width: 100%; font-family: 'Archivo', sans-serif; text-transform: uppercase; letter-spacing: 0.3px; transition: transform 0.12s, filter 0.15s; }
-  .btn:active { transform: scale(0.96); filter: brightness(0.92); }
+  .btn:active, .btn.tap-active { transform: scale(0.96); filter: brightness(0.92); }
   .btn.secondary { background: #1a1f30; color: #7a8aad; border: 1px solid #243049; }
 
   .status-bar { font-size: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px; text-align: center; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
@@ -83,7 +83,7 @@
   .presence-row:last-child { border-bottom: none; }
   .toggle-group { display: flex; gap: 6px; }
   .toggle-btn { padding: 9px 15px; border-radius: 10px; border: 1px solid #1c2333; background: #11141f; color: #7a8aad; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Archivo', sans-serif; transition: transform 0.12s, background 0.15s; }
-  .toggle-btn:active { transform: scale(0.94); }
+  .toggle-btn:active, .toggle-btn.tap-active { transform: scale(0.94); }
   .toggle-btn.present { background: #1a7a3f; color: #fff; border-color: #1a7a3f; }
   .toggle-btn.absent { background: #b33; color: #fff; border-color: #b33; }
 
@@ -135,7 +135,7 @@
   .ev-meta { font-size: 11px; color: #7a8aad; }
   .ev-actions { display: flex; gap: 10px; flex-shrink: 0; align-items: center; }
   .ev-edit, .ev-del { cursor: pointer; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: #1a1f30; transition: transform 0.12s, background 0.15s; }
-  .ev-edit:active, .ev-del:active { transform: scale(0.9); }
+  .ev-edit:active, .ev-del:active, .ev-edit.tap-active, .ev-del.tap-active { transform: scale(0.9); }
   .ev-edit svg { width: 15px; height: 15px; color: #7a8aad; }
   .ev-del svg { width: 15px; height: 15px; color: #ff5a5a; }
   .ev-del:hover, .ev-del:active { background: rgba(255,90,90,0.15); }
@@ -154,7 +154,10 @@
   .add-form input, .add-form select { margin-bottom: 6px; }
   .add-form .field-label { margin: 8px 0 4px; }
   .add-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .add-form-row > div { flex: 1; min-width: 130px; }
+  .add-form-row > div { flex: 1 1 100%; min-width: 0; }
+  @media (min-width: 420px) {
+    .add-form-row > div { flex: 1 1 0; }
+  }
   .add-toggle { width: 100%; padding: 11px; border-radius: 12px; border: 1px dashed #2f3a52; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; cursor: pointer; font-family: 'Archivo', sans-serif; }
 </style>
 </head>
@@ -200,7 +203,7 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-01-7"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-01-8"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -702,9 +705,9 @@ function render() {
     const el = document.getElementById(id);
     if (el && el.value !== fieldValues[id]) el.value = fieldValues[id];
   });
-  if (activeId) {
+  if (activeId && activeId !== "nav-extra") {
     const el = document.getElementById(activeId);
-    if (el && typeof el.focus === "function") {
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA") && typeof el.focus === "function") {
       el.focus();
       if (activeSelStart !== null && typeof el.setSelectionRange === "function") {
         try { el.setSelectionRange(activeSelStart, activeSelEnd); } catch (e) {}
@@ -823,6 +826,7 @@ function renderHome() {
   }
 
   if (PLAYERS.includes(session.nom)) {
+    html += `<div class="section-h">Caisse noire</div>`;
     const total = playerTotal(session.nom);
     const lines = ACTIONS.map((a, i) => ({ name: a[0], val: a[1], count: (grid[session.nom] && grid[session.nom][i]) || 0 }))
       .filter(l => l.count > 0);
@@ -1081,11 +1085,19 @@ function renderPresencePage() {
   const upcoming = sorted.filter(ev => eventDateObj(ev) >= now);
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
 
-  let html = `<div class="section-h">À venir</div>`;
+  let html = "";
   if (upcoming.length === 0) {
-    html += `<div class="card muted">Aucun événement à venir.</div>`;
+    html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir.</div>`;
   } else {
-    upcoming.forEach(ev => { html += renderPresenceEventCard(ev, false); });
+    let lastType = null;
+    upcoming.forEach(ev => {
+      const t = ev[3] || "Autre";
+      if (t !== lastType) {
+        html += `<div class="section-h">${t}</div>`;
+        lastType = t;
+      }
+      html += renderPresenceEventCard(ev, false);
+    });
   }
 
   if (past.length > 0) {
@@ -1192,6 +1204,19 @@ function renderPaiementsPage() {
 function vibrate() {
   if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
 }
+
+// Retour visuel immédiat au toucher, indépendant du rafraîchissement de la page
+// (le CSS :active seul n'a pas toujours le temps de s'afficher avant le re-rendu)
+const TAP_SELECTOR = ".btn, .nav-btn, .toggle-btn, .ev-edit, .ev-del, .bottom-nav button";
+document.addEventListener("touchstart", (e) => {
+  const el = e.target.closest(TAP_SELECTOR);
+  if (el) el.classList.add("tap-active");
+}, { passive: true });
+["touchend", "touchcancel"].forEach(evt => {
+  document.addEventListener(evt, () => {
+    document.querySelectorAll(".tap-active").forEach(el => el.classList.remove("tap-active"));
+  }, { passive: true });
+});
 
 function attachEvents() {
   document.querySelectorAll(".nav-btn").forEach(btn => {
