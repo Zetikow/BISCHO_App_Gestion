@@ -34,7 +34,7 @@
     position: fixed;
     inset: 0;
     z-index: -1;
-    background-image: linear-gradient(180deg, rgba(7,8,13,0.45), rgba(7,8,13,0.62)), url('bg-app.jpg');
+    background-image: linear-gradient(180deg, rgba(7,8,13,0.28), rgba(7,8,13,0.42)), url('bg-app.jpg');
     background-size: cover;
     background-position: center top;
     background-repeat: no-repeat;
@@ -259,6 +259,11 @@
   .pay-summary-sub { font-size: 12px; opacity: 0.9; margin-top: 4px; font-weight: 600; }
   .pointer-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1a2030; }
   .pointer-row:last-child { border-bottom: none; }
+  .pres-card { background: #0d1018; border: 1px solid #1c2333; border-radius: 13px; padding: 10px 12px; margin-bottom: 8px; }
+  .pres-card:last-child { margin-bottom: 0; }
+  .pres-card-row { display: flex; align-items: center; gap: 10px; }
+  .pres-avatar { width: 32px; height: 32px; font-size: 11px; flex-shrink: 0; }
+  .pres-card-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: #e8e8ee; }
   .add-toggle { width: 100%; padding: 11px; border-radius: 12px; border: 1px dashed #2f3a52; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; cursor: pointer; font-family: 'Archivo', sans-serif; }
 </style>
 </head>
@@ -304,7 +309,7 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-02-08"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-02-11"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -1210,7 +1215,7 @@ function renderAgenda() {
     if (session.role === "Admin") {
       html += `<button class="add-toggle" id="generate-trainings" style="border-style:solid; color:#7a8aad;">📅 Générer les entraînements de la saison (mar/jeu)</button>`;
     }
-    html += `<button class="btn add-btn-primary" id="toggle-add-event">${showAddEvent ? "Fermer" : "Ajouter un événement"}</button>`;
+    html += `<button class="btn add-btn-primary" id="toggle-add-event">${showAddEvent ? "− Fermer" : "+ Ajouter un événement"}</button>`;
     if (showAddEvent) {
       html += `<div class="add-form">
         <label class="field-label">Date</label>
@@ -1531,16 +1536,17 @@ function renderPresenceEventCard(ev, isPast) {
       <div class="section-h" style="margin:14px 0 6px;">Pointer ${dayName}</div>`;
     roster.forEach(r => {
       const justif = presenceJustifications[`${id}_${r.p}`];
-      html += `<div class="pointer-row">
-        <div style="font-size:12px; color:#e8e8ee;">${r.p}</div>
-        <div class="toggle-group">
-          <button class="toggle-btn ${r.val === 'Oui' ? 'present' : ''}" data-mark-presence="${id}" data-mark-player="${r.p}" data-mark-val="1">Oui</button>
-          <button class="toggle-btn ${r.val === 'Non' ? 'absent' : ''}" data-mark-presence="${id}" data-mark-player="${r.p}" data-mark-val="0">Non</button>
+      html += `<div class="pres-card">
+        <div class="pres-card-row">
+          <div class="cn-avatar pres-avatar">${getInitials(r.p)}</div>
+          <div class="pres-card-name">${r.p}</div>
+          <div class="toggle-group">
+            <button class="toggle-btn ${r.val === 'Oui' ? 'present' : ''}" data-mark-presence="${id}" data-mark-player="${r.p}" data-mark-val="1">Oui</button>
+            <button class="toggle-btn ${r.val === 'Non' ? 'absent' : ''}" data-mark-presence="${id}" data-mark-player="${r.p}" data-mark-val="0">Non</button>
+          </div>
         </div>
+        ${r.val === "Non" && justif ? `<div class="justif-note"><b>Motif :</b> ${escapeHtml(justif)}</div>` : ""}
       </div>`;
-      if (r.val === "Non" && justif) {
-        html += `<div class="justif-note"><b>Motif de ${r.p} :</b> ${escapeHtml(justif)}</div>`;
-      }
     });
     html += `</div>`;
   }
@@ -1562,7 +1568,7 @@ function renderPaiementsPage() {
     <div class="pay-summary-sub">Sur ${fmt(totalDu)} € dus · ${fmt(totalPayeAll)} € reçus</div>
   </div>`;
 
-  html += `<button class="btn add-btn-primary" id="toggle-add-paiement">${window.__showAddPaiement ? "Fermer" : "Ajouter un paiement"}</button>`;
+  html += `<button class="btn add-btn-primary" id="toggle-add-paiement">${window.__showAddPaiement ? "− Fermer" : "+ Ajouter un paiement"}</button>`;
   if (window.__showAddPaiement) {
     html += `<div class="add-form">
       <label class="field-label">Joueur</label>
