@@ -29,19 +29,14 @@
     padding-bottom: calc(92px + env(safe-area-inset-bottom));
     min-height: 100vh;
   }
-  #bg-fixed {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
+  #app {
+    max-width: 100%;
+    padding: 12px;
     background-image: linear-gradient(180deg, rgba(7,8,13,0.28), rgba(7,8,13,0.42)), url('bg-app.jpg');
-    background-size: cover;
-    background-position: center top;
-    background-repeat: no-repeat;
+    background-size: 100% auto;
+    background-position: top center;
+    background-repeat: repeat-y;
   }
-  #app { max-width: 100%; padding: 12px; }
   .header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-top: env(safe-area-inset-top); }
   .header img { height: 36px; border-radius: 9px; }
   .header .title { font-size: 14px; font-weight: 800; color: #fff; letter-spacing: -0.2px; }
@@ -288,7 +283,6 @@
 </style>
 </head>
 <body>
-<div id="bg-fixed"></div>
 <div id="app">Chargement...</div>
 
 <script src="google-script-config.js"></script>
@@ -330,7 +324,7 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-02-14"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-02-15"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
