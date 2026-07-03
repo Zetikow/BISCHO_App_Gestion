@@ -292,8 +292,13 @@
   .ptype-track { flex: 1; height: 9px; border-radius: 6px; background: #1a1f30; overflow: hidden; }
   .ptype-fill { height: 100%; background: var(--grad); border-radius: 6px; }
   .ptype-pct { width: 62px; flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 800; color: #fff; }
-  .ptype-sub { width: 62px; flex-shrink: 0; text-align: right; font-size: 9px; color: #5a6b8c; }
+  .ptype-sub { width: 68px; flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 700; color: #9db3e0; }
   .poste-select { font-weight: 700; }
+  .poste-locked-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .poste-locked-row .poste-select { flex: 1; }
+  .poste-badge { font-size: 12px; padding: 6px 12px; }
+  .poste-actions { display: flex; gap: 6px; margin-left: auto; }
+  .poste-inline-btn { flex-shrink: 0; width: auto; padding: 9px 14px; }
   .mesjoueurs-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1a2030; }
   .mesjoueurs-row:last-child { border-bottom: none; }
   .mesjoueurs-name { flex: 1; font-size: 12.5px; font-weight: 700; color: #e8e8ee; }
@@ -343,7 +348,7 @@ const TEAMS = ["SM1", "U17", "SM2"];
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-03-03"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-03-04"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -431,7 +436,7 @@ function escapeHtml(str) {
 }
 
 function isFormOpen() {
-  return !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings;
+  return !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined);
 }
 
 async function fetchAll() {
@@ -1753,13 +1758,11 @@ function findCompteRow(nom) {
   return comptes.slice(1).find(c => c[0] === nom) || null;
 }
 
-function computePresenceByType(nom) {
-  const types = ["Match", "Entraînement", "Repas"];
-  const equipe = session.equipe;
+function computePresenceByType(nom, equipe) {
   const relevantEvents = (equipe && equipe !== "Toutes")
     ? evenements.filter(ev => eventEquipe(ev) === equipe)
     : evenements;
-  return types.map(t => {
+  return ["Match", "Entraînement", "Repas"].map(t => {
     const evs = relevantEvents.filter(ev => (ev[3] || "") === t);
     let oui = 0, total = 0;
     evs.forEach(ev => {
@@ -1773,15 +1776,120 @@ function computePresenceByType(nom) {
   });
 }
 
+// Présence agrégée de toute l'équipe (utilisée en vue Coach, plutôt qu'une présence individuelle)
+function computeTeamPresenceByType(equipe) {
+  const roster = rosterForEquipe(equipe);
+  const evs = evenements.filter(ev => eventEquipe(ev) === equipe);
+  return ["Match", "Entraînement", "Repas"].map(t => {
+    const evsT = evs.filter(ev => (ev[3] || "") === t);
+    let oui = 0, total = 0;
+    evsT.forEach(ev => {
+      roster.forEach(p => {
+        const v = presenceEvenements[`${ev[0]}_${p}`];
+        if (v === "Oui" || v === "Non") {
+          total++;
+          if (v === "Oui") oui++;
+        }
+      });
+    });
+    return { type: t, pct: total > 0 ? Math.round((oui / total) * 100) : null, oui, total };
+  });
+}
+
+function renderPtypeCard(title, stats) {
+  return `<div class="card">
+    <div class="section-h">${title}</div>
+    ${stats.map(s => `<div class="ptype-row">
+      <div class="ptype-label">${s.type === "Entraînement" ? "Entraîn." : s.type}</div>
+      <div class="ptype-track"><div class="ptype-fill" style="width:${s.pct ?? 0}%"></div></div>
+      <div class="ptype-pct">${s.pct !== null ? s.pct + "%" : "—"}</div>
+      <div class="ptype-sub">${s.total > 0 ? `${s.oui}/${s.total}` : "aucune donnée"}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
+function currentPostes() {
+  const row = findCompteRow(session.nom);
+  return row && row[5] ? String(row[5]).split(",").map(s => s.trim()).filter(Boolean) : [];
+}
+
+function renderPosteCard(postes) {
+  const editingIndex = window.__profilPosteEditIndex;
+  const remaining = POSTES.filter(p => !postes.includes(p));
+  const showAddRow = postes.length === 0 || (!!window.__profilPosteAdding && remaining.length > 0);
+
+  let html = `<div class="card"><div class="section-h">Poste</div>`;
+
+  postes.forEach((p, i) => {
+    if (editingIndex === i) {
+      html += `<div class="poste-locked-row">
+        <select id="profil-poste-edit-${i}" class="poste-select">${POSTES.map(o => `<option value="${o}" ${o === p ? "selected" : ""}>${o}</option>`).join("")}</select>
+        <button class="btn secondary poste-inline-btn" data-poste-save-index="${i}">Valider</button>
+      </div>`;
+    } else {
+      html += `<div class="poste-locked-row">
+        <span class="badge poste-badge">${p}</span>
+        <div class="poste-actions">
+          <button class="justif-edit-btn" data-poste-edit-index="${i}">Modifier</button>
+          <button class="justif-edit-btn" data-poste-remove-index="${i}">Supprimer</button>
+        </div>
+      </div>`;
+    }
+  });
+
+  if (showAddRow) {
+    html += `<div class="poste-locked-row">
+      <select id="profil-poste-new" class="poste-select">
+        <option value="">— Choisir —</option>
+        ${remaining.map(p => `<option value="${p}">${p}</option>`).join("")}
+      </select>
+      <button class="btn secondary poste-inline-btn" id="profil-poste-add-submit">Ajouter</button>
+    </div>`;
+  } else if (remaining.length > 0) {
+    html += `<button class="add-toggle" id="profil-poste-add-toggle" style="margin-top:4px;">+ Ajouter un poste</button>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderStatsRecapCard(postes) {
+  const isGardien = postes.includes("GB");
+  return `<div class="card">
+    <div class="section-h">Tes statistiques de match</div>
+    <div class="grid2">
+      <div class="stat">
+        <div class="stat-label">${isGardien ? "Arrêts (saison)" : "Buts (saison)"}</div>
+        <div class="stat-value">—</div>
+        <div class="stat-sub">Bientôt disponible</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Passes (saison)</div>
+        <div class="stat-value">—</div>
+        <div class="stat-sub">Bientôt disponible</div>
+      </div>
+    </div>
+    <div class="profil-photo-note">Ces chiffres arriveront avec la page Statistiques (vidéos de match, stats techniques).</div>
+  </div>`;
+}
+
 function renderProfilPage() {
   const myRow = findCompteRow(session.nom);
   const personne = myRow ? (myRow[4] || myRow[0]) : session.nom;
   const linkedRows = comptes.slice(1).filter(c => (c[4] || c[0]) === personne);
-  const poste = myRow ? (myRow[5] || "") : "";
+  const postes = currentPostes();
   const nomComplet = myRow ? (myRow[6] || "") : "";
   const photoUrl = myRow ? (myRow[7] || "") : "";
   const canEditPoste = session.role === "Joueur" || session.role === "Coach" || session.role === "Admin";
-  const isCoach = session.role === "Coach";
+
+  const linkedRoles = new Set(linkedRows.map(r => r[1]));
+  const canViewJoueur = linkedRoles.has("Joueur");
+  const canViewCoach = linkedRoles.has("Coach");
+  const showVueToggle = canViewJoueur && canViewCoach;
+  const defaultVue = session.role === "Coach" ? "coach" : "joueur";
+  const vue = showVueToggle
+    ? ((window.__profilVue === "coach" || window.__profilVue === "joueur") ? window.__profilVue : defaultVue)
+    : (canViewCoach && !canViewJoueur ? "coach" : "joueur");
 
   let html = `<div class="page-title">Mon profil joueur</div>`;
   html += `<div class="page-sub">${nomComplet ? escapeHtml(nomComplet) : session.nom}</div>`;
@@ -1795,37 +1903,28 @@ function renderProfilPage() {
   // Rôle dans le groupe
   html += `<div class="card">
     <div class="section-h">Rôle dans le groupe</div>
-    <div class="pill-row" style="display:flex; flex-wrap:wrap; gap:6px;">
+    <div style="display:flex; flex-wrap:wrap; gap:6px;">
       ${linkedRows.map(r => `<span class="badge">${r[1]} ${r[3] || "SM1"}</span>`).join("")}
     </div>
   </div>`;
 
-  // Poste (Joueur / Coach uniquement)
-  if (canEditPoste) {
-    html += `<div class="card">
-      <div class="section-h">Poste</div>
-      <select id="profil-poste" class="poste-select">
-        <option value="">— Choisir —</option>
-        ${POSTES.map(p => `<option value="${p}" ${poste === p ? "selected" : ""}>${p}</option>`).join("")}
-      </select>
+  if (showVueToggle) {
+    html += `<div class="team-switch-row">
+      <button type="button" class="team-switch-btn ${vue === 'joueur' ? 'active' : ''}" data-profil-vue="joueur">Vue Joueur</button>
+      <button type="button" class="team-switch-btn ${vue === 'coach' ? 'active' : ''}" data-profil-vue="coach">Vue Coach</button>
     </div>`;
   }
 
-  // Présence / Absences par type
-  const stats = computePresenceByType(session.nom);
-  html += `<div class="card">
-    <div class="section-h">Présence par type</div>
-    ${stats.map(s => `<div class="ptype-row">
-      <div class="ptype-label">${s.type === "Entraînement" ? "Entraîn." : s.type}</div>
-      <div class="ptype-track"><div class="ptype-fill" style="width:${s.pct ?? 0}%"></div></div>
-      <div class="ptype-pct">${s.pct !== null ? s.pct + "%" : "—"}</div>
-      <div class="ptype-sub">${s.total > 0 ? `${s.oui}/${s.total}` : "aucune donnée"}</div>
-    </div>`).join("")}
-  </div>`;
+  if (canEditPoste) html += renderPosteCard(postes);
 
-  // Mes joueurs (Coach uniquement)
-  if (isCoach) {
-    const mesJoueurs = comptes.slice(1).filter(c => c[1] === "Joueur" && (c[3] || "SM1") === (session.equipe || "SM1"));
+  if (vue === "coach") {
+    const coachRow = linkedRows.find(r => r[1] === "Coach");
+    const coachEquipe = coachRow ? (coachRow[3] || "SM1") : (session.equipe || "SM1");
+    html += renderPtypeCard(`Présence par type — équipe ${coachEquipe}`, computeTeamPresenceByType(coachEquipe));
+    html += renderAverageCard(coachEquipe, false);
+    html += renderAverageCard(coachEquipe, true);
+
+    const mesJoueurs = comptes.slice(1).filter(c => c[1] === "Joueur" && (c[3] || "SM1") === coachEquipe);
     const showAll = !!window.__profilJoueursExpanded;
     const visible = showAll ? mesJoueurs : mesJoueurs.slice(0, 4);
     html += `<div class="card">
@@ -1834,10 +1933,16 @@ function renderProfilPage() {
         <div class="mesjoueurs-row">
           <div class="cn-avatar" style="width:32px; height:32px; font-size:11px;">${getInitials(j[0])}</div>
           <div class="mesjoueurs-name">${j[0]}</div>
-          ${j[5] ? `<span class="badge">${j[5]}</span>` : ""}
+          ${j[5] ? `<span class="badge">${String(j[5]).split(",")[0]}</span>` : ""}
         </div>`).join("")}
       ${mesJoueurs.length > 4 ? `<div class="expand-toggle" data-toggle-profil-joueurs="1">${showAll ? "Réduire ▲" : "Voir les autres ▾"}</div>` : ""}
     </div>`;
+  } else {
+    const joueurRow = linkedRows.find(r => r[1] === "Joueur");
+    const joueurNom = joueurRow ? joueurRow[0] : session.nom;
+    const joueurEquipe = joueurRow ? (joueurRow[3] || "SM1") : (session.equipe || "SM1");
+    html += renderPtypeCard("Présence par type", computePresenceByType(joueurNom, joueurEquipe));
+    html += renderStatsRecapCard(postes);
   }
 
   return html;
@@ -1985,8 +2090,55 @@ function attachEvents() {
     };
   });
 
-  const profilPoste = document.getElementById("profil-poste");
-  if (profilPoste) profilPoste.onchange = (e) => { setPosteApi(session.nom, e.target.value); };
+  document.querySelectorAll("[data-poste-edit-index]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      window.__profilPosteEditIndex = parseInt(el.dataset.posteEditIndex, 10);
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-poste-save-index]").forEach(el => {
+    el.onclick = () => {
+      const i = parseInt(el.dataset.posteSaveIndex, 10);
+      const newVal = document.getElementById(`profil-poste-edit-${i}`).value;
+      const postes = currentPostes();
+      if (newVal) postes[i] = newVal;
+      window.__profilPosteEditIndex = null;
+      setPosteApi(session.nom, postes.join(","));
+    };
+  });
+
+  document.querySelectorAll("[data-poste-remove-index]").forEach(el => {
+    el.onclick = () => {
+      if (!confirm("Supprimer ce poste ?")) return;
+      const i = parseInt(el.dataset.posteRemoveIndex, 10);
+      const postes = currentPostes();
+      postes.splice(i, 1);
+      setPosteApi(session.nom, postes.join(","));
+    };
+  });
+
+  const posteAddToggle = document.getElementById("profil-poste-add-toggle");
+  if (posteAddToggle) posteAddToggle.onclick = () => { window.__profilPosteAdding = true; render(); };
+
+  const posteAddSubmit = document.getElementById("profil-poste-add-submit");
+  if (posteAddSubmit) posteAddSubmit.onclick = () => {
+    const newVal = document.getElementById("profil-poste-new").value;
+    window.__profilPosteAdding = false;
+    if (!newVal) { render(); return; }
+    const postes = currentPostes();
+    postes.push(newVal);
+    setPosteApi(session.nom, postes.join(","));
+  };
+
+  document.querySelectorAll("[data-profil-vue]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      window.__profilVue = el.dataset.profilVue;
+      render();
+    };
+  });
 
   const toggleProfilJoueurs = document.querySelector("[data-toggle-profil-joueurs]");
   if (toggleProfilJoueurs) toggleProfilJoueurs.onclick = () => {
