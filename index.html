@@ -279,6 +279,21 @@
   .pres-card-row { display: flex; align-items: center; gap: 10px; }
   .pres-avatar { width: 32px; height: 32px; font-size: 11px; flex-shrink: 0; }
   .pres-card-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: #e8e8ee; }
+
+  .profil-photo-zone { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; }
+  .profil-photo-frame { width: 92px; height: 92px; border-radius: 22px; background: var(--grad); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 30px; overflow: hidden; border: 1px solid rgba(0,212,255,0.35); }
+  .profil-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+  .profil-photo-note { font-size: 10.5px; color: #5a6b8c; font-style: italic; text-align: center; }
+  .ptype-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .ptype-label { width: 92px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #c3ccde; }
+  .ptype-track { flex: 1; height: 9px; border-radius: 6px; background: #1a1f30; overflow: hidden; }
+  .ptype-fill { height: 100%; background: var(--grad); border-radius: 6px; }
+  .ptype-pct { width: 62px; flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 800; color: #fff; }
+  .ptype-sub { width: 62px; flex-shrink: 0; text-align: right; font-size: 9px; color: #5a6b8c; }
+  .poste-select { font-weight: 700; }
+  .mesjoueurs-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1a2030; }
+  .mesjoueurs-row:last-child { border-bottom: none; }
+  .mesjoueurs-name { flex: 1; font-size: 12.5px; font-weight: 700; color: #e8e8ee; }
   .add-toggle { width: 100%; padding: 11px; border-radius: 12px; border: 1px dashed #2f3a52; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px; cursor: pointer; font-family: 'Archivo', sans-serif; }
 </style>
 </head>
@@ -325,12 +340,12 @@ const TEAMS = ["SM1", "U17", "SM2"];
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-03-01"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-03-02"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
 let grid = {};
-let comptes = []; // [[nom, role, code], ...]
+let comptes = []; // [[nom, role, code, equipe, personne, poste, nomComplet, photoUrl], ...] (+ header row)
 let presences = {}; // { "YYYY-MM-DD_Nom": "1"/"0" }
 let paiements = []; // [[id, joueur, montant, date, commentaire], ...]
 let evenements = []; // [[id, date, heure, type, titre, lieu, equipe], ...]
@@ -542,6 +557,16 @@ async function writeJustificationApi(eventId, nom, texte) {
     isOnline = true;
   } catch (err) { isOnline = false; }
   render();
+}
+
+async function setPosteApi(nom, poste) {
+  const row = findCompteRow(nom);
+  if (row) row[5] = poste; // mise à jour optimiste locale
+  render();
+  try {
+    await fetch(`${GOOGLE_SCRIPT_URL}?action=setPoste&nom=${encodeURIComponent(nom)}&poste=${encodeURIComponent(poste)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    isOnline = true;
+  } catch (err) { isOnline = false; render(); }
 }
 
 async function checkAccountStatus(nom) {
@@ -899,7 +924,7 @@ function render() {
       ${window.__avatarMenuOpen ? `<div class="avatar-menu">
         <div class="avatar-menu-name">${session.nom}</div>
         <div class="badge avatar-menu-role">${session.role}</div>
-        <div class="avatar-menu-item disabled" id="menu-profil">Profil</div>
+        <div class="avatar-menu-item" id="menu-profil">Mon profil</div>
         <div class="avatar-menu-item" id="menu-changecode">Changer le code</div>
         <div class="avatar-menu-item danger" id="menu-logout">Se déconnecter</div>
       </div>` : ""}
@@ -937,6 +962,7 @@ function render() {
   else if (currentPage === "table") html += renderCaisseNoireSummary();
   else if (currentPage === "presence") html += renderPresencePage();
   else if (currentPage === "paiements") html += renderPaiementsPage();
+  else if (currentPage === "profil") html += renderProfilPage();
 
   html += `<div class="bottom-nav">`;
   html += mainTabs.map(t =>
@@ -1619,6 +1645,102 @@ function renderPresenceEventCard(ev, isPast) {
   return html;
 }
 
+const POSTES = ["ALD", "ARD", "DC", "ARG", "ALG", "PV", "GB", "COACH"];
+
+function findCompteRow(nom) {
+  return comptes.slice(1).find(c => c[0] === nom) || null;
+}
+
+function computePresenceByType(nom) {
+  const types = ["Match", "Entraînement", "Repas"];
+  const equipe = session.equipe;
+  const relevantEvents = (equipe && equipe !== "Toutes")
+    ? evenements.filter(ev => eventEquipe(ev) === equipe)
+    : evenements;
+  return types.map(t => {
+    const evs = relevantEvents.filter(ev => (ev[3] || "") === t);
+    let oui = 0, total = 0;
+    evs.forEach(ev => {
+      const v = presenceEvenements[`${ev[0]}_${nom}`];
+      if (v === "Oui" || v === "Non") {
+        total++;
+        if (v === "Oui") oui++;
+      }
+    });
+    return { type: t, pct: total > 0 ? Math.round((oui / total) * 100) : null, oui, total };
+  });
+}
+
+function renderProfilPage() {
+  const myRow = findCompteRow(session.nom);
+  const personne = myRow ? (myRow[4] || myRow[0]) : session.nom;
+  const linkedRows = comptes.slice(1).filter(c => (c[4] || c[0]) === personne);
+  const poste = myRow ? (myRow[5] || "") : "";
+  const nomComplet = myRow ? (myRow[6] || "") : "";
+  const photoUrl = myRow ? (myRow[7] || "") : "";
+  const canEditPoste = session.role === "Joueur" || session.role === "Coach";
+  const isCoach = session.role === "Coach";
+
+  let html = `<div class="page-title">Mon profil joueur</div>`;
+  html += `<div class="page-sub">${nomComplet ? escapeHtml(nomComplet) : session.nom}</div>`;
+
+  // Photo
+  html += `<div class="card"><div class="profil-photo-zone">
+    <div class="profil-photo-frame">${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Photo de ${escapeHtml(session.nom)}"/>` : getInitials(session.nom)}</div>
+    ${!photoUrl ? `<div class="profil-photo-note">Photo officielle à venir — ajoutée par l'Admin</div>` : ""}
+  </div></div>`;
+
+  // Rôle dans le groupe
+  html += `<div class="card">
+    <div class="section-h">Rôle dans le groupe</div>
+    <div class="pill-row" style="display:flex; flex-wrap:wrap; gap:6px;">
+      ${linkedRows.map(r => `<span class="badge">${r[1]} ${r[3] || "SM1"}</span>`).join("")}
+    </div>
+  </div>`;
+
+  // Poste (Joueur / Coach uniquement)
+  if (canEditPoste) {
+    html += `<div class="card">
+      <div class="section-h">Poste</div>
+      <select id="profil-poste" class="poste-select">
+        <option value="">— Choisir —</option>
+        ${POSTES.map(p => `<option value="${p}" ${poste === p ? "selected" : ""}>${p}</option>`).join("")}
+      </select>
+    </div>`;
+  }
+
+  // Présence / Absences par type
+  const stats = computePresenceByType(session.nom);
+  html += `<div class="card">
+    <div class="section-h">Présence par type</div>
+    ${stats.map(s => `<div class="ptype-row">
+      <div class="ptype-label">${s.type === "Entraînement" ? "Entraîn." : s.type}</div>
+      <div class="ptype-track"><div class="ptype-fill" style="width:${s.pct ?? 0}%"></div></div>
+      <div class="ptype-pct">${s.pct !== null ? s.pct + "%" : "—"}</div>
+      <div class="ptype-sub">${s.total > 0 ? `${s.oui}/${s.total}` : "aucune donnée"}</div>
+    </div>`).join("")}
+  </div>`;
+
+  // Mes joueurs (Coach uniquement)
+  if (isCoach) {
+    const mesJoueurs = comptes.slice(1).filter(c => c[1] === "Joueur" && (c[3] || "SM1") === (session.equipe || "SM1"));
+    const showAll = !!window.__profilJoueursExpanded;
+    const visible = showAll ? mesJoueurs : mesJoueurs.slice(0, 4);
+    html += `<div class="card">
+      <div class="section-h">Mes joueurs (${mesJoueurs.length})</div>
+      ${mesJoueurs.length === 0 ? `<div class="muted">Aucun joueur trouvé pour cette équipe.</div>` : visible.map(j => `
+        <div class="mesjoueurs-row">
+          <div class="cn-avatar" style="width:32px; height:32px; font-size:11px;">${getInitials(j[0])}</div>
+          <div class="mesjoueurs-name">${j[0]}</div>
+          ${j[5] ? `<span class="badge">${j[5]}</span>` : ""}
+        </div>`).join("")}
+      ${mesJoueurs.length > 4 ? `<div class="expand-toggle" data-toggle-profil-joueurs="1">${showAll ? "Réduire ▲" : "Voir les autres ▾"}</div>` : ""}
+    </div>`;
+  }
+
+  return html;
+}
+
 function renderPaiementsPage() {
   const totalDu = grandTotal();
   const totalPayeAll = paiements.reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
@@ -1761,6 +1883,15 @@ function attachEvents() {
     };
   });
 
+  const profilPoste = document.getElementById("profil-poste");
+  if (profilPoste) profilPoste.onchange = (e) => { setPosteApi(session.nom, e.target.value); };
+
+  const toggleProfilJoueurs = document.querySelector("[data-toggle-profil-joueurs]");
+  if (toggleProfilJoueurs) toggleProfilJoueurs.onclick = () => {
+    window.__profilJoueursExpanded = !window.__profilJoueursExpanded;
+    render();
+  };
+
   const toggleAddEvent = document.getElementById("toggle-add-event");
   if (toggleAddEvent) toggleAddEvent.onclick = () => { showAddEvent = !showAddEvent; render(); };
 
@@ -1853,6 +1984,13 @@ function attachEvents() {
 
   const avatarBtn = document.getElementById("avatar-btn");
   if (avatarBtn) avatarBtn.onclick = () => { window.__avatarMenuOpen = !window.__avatarMenuOpen; render(); };
+
+  const menuProfil = document.getElementById("menu-profil");
+  if (menuProfil) menuProfil.onclick = () => {
+    window.__avatarMenuOpen = false;
+    currentPage = "profil";
+    render();
+  };
 
   const menuChangeCode = document.getElementById("menu-changecode");
   if (menuChangeCode) menuChangeCode.onclick = () => {
