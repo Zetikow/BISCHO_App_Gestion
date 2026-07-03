@@ -320,11 +320,12 @@ const ACTIONS = [
 ];
 
 const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S.","Romain J.","Volodia M.","Victor P.","Mattéo MP.","Gabriel W.","Basil L.","Brahim I.","Maximilien M.","Arthur M.","Damien P.","Alexis W.","Mathieu S.","Nicolas Z.","Robin S."];
+const TEAMS = ["SM1", "U17", "SM2"];
 
 const LOGO_DATA_URI = "icon-512.png";
-const SESSION_KEY = "caisse-noire-session"; // {nom, role}
+const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-02-16"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-03-01"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -332,7 +333,7 @@ let grid = {};
 let comptes = []; // [[nom, role, code], ...]
 let presences = {}; // { "YYYY-MM-DD_Nom": "1"/"0" }
 let paiements = []; // [[id, joueur, montant, date, commentaire], ...]
-let evenements = []; // [[id, date, heure, type, titre, lieu], ...]
+let evenements = []; // [[id, date, heure, type, titre, lieu, equipe], ...]
 let presenceEvenements = {}; // { eventId_nom: "Oui"/"Non" }
 let presenceJustifications = {}; // { eventId_nom: "texte du motif" }
 
@@ -351,6 +352,7 @@ let isOnline = false;
 let loginError = "";
 let loginNeedsSetup = null; // null = pas encore vérifié, true/false ensuite
 let loginSelectedNom = "";
+let loginNoms = null; // [{nom, role}, ...] chargé avant connexion, remplace la liste figée PLAYERS pour le menu
 let showAddEvent = false;
 
 // ---------- Données ----------
@@ -488,9 +490,9 @@ async function deletePaiementApi(id) {
   } catch (err) { isOnline = false; render(); }
 }
 
-async function addEvenementApi(date, heure, type, titre, lieu) {
+async function addEvenementApi(date, heure, type, titre, lieu, equipe) {
   try {
-    await fetch(`${GOOGLE_SCRIPT_URL}?action=addEvenement&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    await fetch(`${GOOGLE_SCRIPT_URL}?action=addEvenement&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&equipe=${encodeURIComponent(equipe || session.equipe || "SM1")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     showAddEvent = false;
     await fetchAll();
   } catch (err) { isOnline = false; render(); }
@@ -503,9 +505,9 @@ async function deleteEvenementApi(id) {
   } catch (err) { isOnline = false; render(); }
 }
 
-async function updateEvenementApi(id, date, heure, type, titre, lieu) {
+async function updateEvenementApi(id, date, heure, type, titre, lieu, equipe) {
   try {
-    await fetch(`${GOOGLE_SCRIPT_URL}?action=updateEvenement&id=${encodeURIComponent(id)}&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    await fetch(`${GOOGLE_SCRIPT_URL}?action=updateEvenement&id=${encodeURIComponent(id)}&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&equipe=${encodeURIComponent(equipe || "SM1")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     window.__editingEvenementId = null;
     await fetchAll();
   } catch (err) { isOnline = false; render(); }
@@ -559,7 +561,7 @@ async function setInitialCode(nom, newCode) {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=setCode&nom=${encodeURIComponent(nom)}&newCode=${encodeURIComponent(newCode)}`);
     const data = await res.json();
     if (data.ok) {
-      session = { nom, role: data.role, code: newCode };
+      session = { nom, role: data.role, code: newCode, equipe: data.equipe || "SM1" };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       currentPage = "home";
       await fetchAll();
@@ -583,7 +585,7 @@ async function tryLogin(nom, code) {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=login&nom=${encodeURIComponent(nom)}&code=${encodeURIComponent(code)}`);
     const data = await res.json();
     if (data.ok) {
-      session = { nom, role: data.role, code };
+      session = { nom, role: data.role, code, equipe: data.equipe || "SM1" };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       currentPage = "home";
       await fetchAll();
@@ -802,12 +804,20 @@ function isEntrainement(ev) {
   return typeClass(ev[3]) === "entrainement";
 }
 
-// Un Bénévole ne voit jamais les entraînements, seulement les autres types d'événements
+// Un Bénévole ne voit jamais les entraînements, seulement les autres types d'événements.
+// Chaque équipe ne voit que ses propres événements ; l'Admin voit tout (toutes équipes).
+function eventEquipe(ev) {
+  return ev[6] || "SM1";
+}
 function getVisibleEvenements() {
-  if (session && session.role === "Bénévole") {
-    return evenements.filter(ev => !isEntrainement(ev));
+  let list = evenements;
+  if (session && session.role !== "Admin") {
+    list = list.filter(ev => eventEquipe(ev) === (session.equipe || "SM1"));
   }
-  return evenements;
+  if (session && session.role === "Bénévole") {
+    list = list.filter(ev => !isEntrainement(ev));
+  }
+  return list;
 }
 
 function sortedVisibleEvenements() {
@@ -917,7 +927,7 @@ function render() {
     html += `<div class="status-bar status-offline">Hors ligne - nouvelle tentative...</div>`;
   }
 
-  const tabs = getTabsForRole(session.role);
+  const tabs = getTabsForRole(session.role, session.equipe);
   const mainTabs = tabs.filter(t => t.main);
   const extraTabs = tabs.filter(t => !t.main);
   const currentIsExtra = extraTabs.some(t => t.id === currentPage);
@@ -986,15 +996,18 @@ const NAV_ICONS = {
   more: '<path d="M12 5v14M5 12h14"/>',
 };
 
-function getTabsForRole(role) {
+function getTabsForRole(role, equipe) {
   const tabs = [
     { id: "home", label: "Accueil", main: true },
     { id: "agenda", label: "Agenda", main: true },
   ];
-  if (role === "Joueur" || role === "Coach" || role === "Admin") {
+  // Caisse noire, Présence et Paiements restent réservés à la SM1 pour le moment
+  // (l'Admin, dont l'équipe est "Toutes", garde accès à tout).
+  const isSM1 = equipe === "SM1" || role === "Admin";
+  if (isSM1 && (role === "Joueur" || role === "Coach" || role === "Admin")) {
     tabs.push({ id: "table", label: "Caisse", main: true });
   }
-  if (role === "Coach" || role === "Admin") tabs.push({ id: "presence", label: "Présence", main: false });
+  if (isSM1 && (role === "Coach" || role === "Admin")) tabs.push({ id: "presence", label: "Présence", main: false });
   if (role === "Admin") tabs.push({ id: "paiements", label: "Paiements", main: false });
   return tabs;
 }
@@ -1028,10 +1041,9 @@ function renderLogin() {
     <label class="field-label">Ton nom</label>
     <select id="login-nom">
       <option value="">-- Choisir --</option>
-      ${PLAYERS.map(p => `<option value="${p}" ${p === loginSelectedNom ? "selected" : ""}>${p}</option>`).join("")}
-      <option value="Coach" ${loginSelectedNom === "Coach" ? "selected" : ""}>Coach</option>
-      <option value="Admin" ${loginSelectedNom === "Admin" ? "selected" : ""}>Admin</option>
-      <option value="Bénévole" ${loginSelectedNom === "Bénévole" ? "selected" : ""}>Bénévole</option>
+      ${loginNoms
+        ? loginNoms.map(c => `<option value="${c.nom}" ${c.nom === loginSelectedNom ? "selected" : ""}>${c.nom}</option>`).join("")
+        : [...PLAYERS, "Coach", "Admin", "Bénévole"].map(p => `<option value="${p}" ${p === loginSelectedNom ? "selected" : ""}>${p}</option>`).join("")}
     </select>
     ${formHtml}
     ${loginError ? `<div class="login-error">${loginError}</div>` : ""}
@@ -1066,9 +1078,10 @@ function attachLoginEvents() {
 }
 
 function computeSeasonAverages() {
+  const evenementsSM1 = evenements.filter(ev => eventEquipe(ev) === "SM1");
   return PLAYERS.map(p => {
     let oui = 0, total = 0;
-    evenements.forEach(ev => {
+    evenementsSM1.forEach(ev => {
       const v = presenceEvenements[`${ev[0]}_${p}`];
       if (v === "Oui" || v === "Non") {
         total++;
@@ -1217,6 +1230,7 @@ function renderNextEventCard() {
   return `<div class="next-card"><div class="nc-inner">
     <div class="nc-glow"></div>
     <span class="ev-type ${typeClass(type)}">${type || "Événement"}</span>
+    ${session.role === "Admin" ? `<span class="ev-type" style="background:rgba(154,166,196,0.15); color:#9aa6c4;">${ev[6] || "SM1"}</span>` : ""}
     <div class="nc-countdown" style="margin-left:6px;">⚡ ${countdownLabel}</div>
     <div class="nc-title">${ev[4] || "Événement"}</div>
     <div class="nc-meta">${formatEventDateFr(ev)} ${ev[2] ? "· " + formatHeure(ev) : ""} ${ev[5] ? "· " + ev[5] : ""}</div>
@@ -1229,7 +1243,8 @@ function renderNextEventCard() {
 
 function renderAgenda() {
   const canManage = session.role === "Coach" || session.role === "Admin";
-  let html = `<div class="page-title">Agenda</div><div class="page-sub">Matchs, entraînements et événements de l'équipe.</div>`;
+  const equipeLabel = session.role === "Admin" ? "toutes les équipes" : `l'équipe ${session.equipe || "SM1"}`;
+  let html = `<div class="page-title">Agenda</div><div class="page-sub">Matchs, entraînements et événements de ${equipeLabel}.</div>`;
 
   if (canManage) {
     if (session.role === "Admin") {
@@ -1254,6 +1269,10 @@ function renderAgenda() {
         <input id="ev-titre" type="text" placeholder="ex: Bischo vs Illkirch" />
         <label class="field-label">Lieu</label>
         <input id="ev-lieu" type="text" value="Lustucru Arena" />
+        ${session.role === "Admin" ? `<label class="field-label">Équipe</label>
+        <select id="ev-equipe">
+          ${TEAMS.map(t => `<option value="${t}">${t}</option>`).join("")}
+        </select>` : ""}
         <button class="btn" id="submit-add-event" style="margin-top:4px;">Enregistrer l'événement</button>
       </div>`;
     }
@@ -1315,7 +1334,7 @@ function renderJustifBlock(eventId) {
 }
 
 function renderEventCard(ev, canManage, isPast) {
-  const [id, date, heure, type, titre, lieu] = ev;
+  const [id, date, heure, type, titre, lieu, equipe] = ev;
   const d = eventDateObj(ev);
   const val = presenceEvenements[`${id}_${session.nom}`];
   let presentCount = 0, absentCount = 0;
@@ -1340,6 +1359,10 @@ function renderEventCard(ev, canManage, isPast) {
       <input id="edit-ev-titre-${id}" type="text" value="${titre || ''}" />
       <label class="field-label">Lieu</label>
       <input id="edit-ev-lieu-${id}" type="text" value="${lieu || ''}" />
+      ${session.role === "Admin" ? `<label class="field-label">Équipe</label>
+      <select id="edit-ev-equipe-${id}">
+        ${TEAMS.map(t => `<option value="${t}" ${(equipe || "SM1") === t ? "selected" : ""}>${t}</option>`).join("")}
+      </select>` : ""}
       <div class="row-flex" style="margin-top:10px;">
         <button class="btn" style="flex:1;" data-save-event="${id}">Enregistrer</button>
         <button class="btn secondary" style="flex:1;" data-cancel-edit-event="1">Annuler</button>
@@ -1355,6 +1378,7 @@ function renderEventCard(ev, canManage, isPast) {
     <div class="ev-divider"></div>
     <div class="ev-info">
       <span class="ev-type ${typeClass(type)}">${type || "Événement"}</span>
+      ${session.role === "Admin" ? `<span class="ev-type" style="background:rgba(154,166,196,0.15); color:#9aa6c4;">${equipe || "SM1"}</span>` : ""}
       <div class="ev-title">${titre || "Sans titre"}</div>
       <div class="ev-date-full">${dateFr}${heureFmt ? " · " + heureFmt : ""}</div>
       <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
@@ -1513,7 +1537,9 @@ function renderDetailTable() {
 }
 
 function renderPresencePage() {
-  const sorted = sortedEvenements();
+  // La présence (basée sur le roster PLAYERS) reste SM1 uniquement pour le moment,
+  // même pour l'Admin qui voit toutes les équipes dans l'Agenda.
+  const sorted = sortedEvenements().filter(ev => eventEquipe(ev) === "SM1");
   const now = new Date();
   const upcoming = sorted.filter(ev => eventDateObj(ev) >= now);
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
@@ -1788,8 +1814,10 @@ function attachEvents() {
     const type = document.getElementById("ev-type").value;
     const titre = document.getElementById("ev-titre").value;
     const lieu = document.getElementById("ev-lieu").value;
+    const equipeSelect = document.getElementById("ev-equipe");
+    const equipe = equipeSelect ? equipeSelect.value : (session.equipe || "SM1");
     if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
-    addEvenementApi(date, heure, type, titre, lieu);
+    addEvenementApi(date, heure, type, titre, lieu, equipe);
   };
 
   document.querySelectorAll("[data-delete-event]").forEach(el => {
@@ -1815,8 +1843,11 @@ function attachEvents() {
       const type = document.getElementById(`edit-ev-type-${id}`).value;
       const titre = document.getElementById(`edit-ev-titre-${id}`).value;
       const lieu = document.getElementById(`edit-ev-lieu-${id}`).value;
+      const equipeSelect = document.getElementById(`edit-ev-equipe-${id}`);
+      const existing = evenements.find(ev => ev[0] === id);
+      const equipe = equipeSelect ? equipeSelect.value : (existing ? existing[6] : "SM1");
       if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
-      updateEvenementApi(id, date, heure, type, titre, lieu);
+      updateEvenementApi(id, date, heure, type, titre, lieu, equipe);
     };
   });
 
@@ -2009,9 +2040,21 @@ document.addEventListener("click", (e) => {
   }
 });
 
+async function fetchLoginNoms() {
+  try {
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=listNoms`);
+    const data = await res.json();
+    if (data.ok) {
+      loginNoms = data.noms;
+      if (!session) render();
+    }
+  } catch (err) { /* reste sur la liste figée en cas d'échec */ }
+}
+
 grid = initGrid();
 render();
 if (session) startPolling();
+else fetchLoginNoms();
 </script>
 </body>
 </html>
