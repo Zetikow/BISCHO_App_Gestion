@@ -302,6 +302,9 @@
   .add-form { background: #0d1018; border: 1px dashed #243049; border-radius: 14px; padding: 12px; margin-bottom: 12px; animation: qaFadeIn 0.18s ease-out; }
   .scorenco-widget-todo { border: 1px dashed #3a4666; background: #0d1018ee; }
   .scorenco-widget-todo code { background: #1a1f30; padding: 1px 5px; border-radius: 5px; font-size: 10px; }
+  .ldsdr { display: inline-block; width: 60px; height: 60px; }
+  .ldsdr:after { content: " "; display: block; width: 48px; height: 48px; margin: 6px; border-radius: 50%; border: 5px solid #1E457B; border-color: #1E457B transparent; animation: ldsdr 1.2s linear infinite; }
+  @keyframes ldsdr { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   @keyframes qaFadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
   .add-form input, .add-form select { margin-bottom: 6px; }
   .add-form .field-label { margin: 8px 0 4px; }
@@ -408,29 +411,48 @@ const TEAMS = ["SM1", "U17", "SM2"];
 // Colle ici l'URL d'intégration (iframe) du widget "Équipe" créé sur ton espace Score'n'co,
 // une par équipe. Laisse vide "" tant que le widget n'est pas encore créé : la carte ne
 // s'affiche simplement pas pour cette équipe-là.
-const SCORENCO_WIDGETS = {
-  SM1: "https://widgets.scorenco.com/team/192700",
+// IDs des widgets "Équipe" Score'n'co (un par équipe), au format div adaptatif —
+// pas des URLs d'iframe. Laisse vide "" tant que le widget n'est pas encore créé.
+const SCORENCO_WIDGET_IDS = {
+  SM1: "192700",
   U17: "",
   SM2: "",
 };
 
 function renderScorencoWidget(equipe) {
-  const url = SCORENCO_WIDGETS[equipe];
-  if (url) {
-    return `<div class="card scorenco-widget">
+  const widgetId = SCORENCO_WIDGET_IDS[equipe];
+  if (widgetId) {
+    ensureScorencoScript();
+    return `<div class="card">
       <div class="section-h" style="margin-bottom:8px;">Calendrier officiel FFHB — ${equipe}</div>
-      <iframe src="${escapeHtml(url)}" style="width:100%; border:0; border-width:0; border-radius:10px; display:block;" height="500" width="100%" frameborder="0" referrerpolicy="unsafe-url" loading="lazy"></iframe>
+      <div class="scorenco-widget" data-widget-type="team" data-widget-id="${escapeHtml(widgetId)}" style="background:#F2F5F9; height:500px; display:flex; align-items:center; justify-content:center; flex-direction:column; text-transform:uppercase; font-family:sans-serif; font-weight:bolder; gap:9px; color:#1E457B; border-radius:10px; overflow:hidden;">
+        <div class="ldsdr"></div>
+        Score'n'co - HBC Bischoffsheim
+      </div>
     </div>`;
   }
   // Pas encore configuré : rappel visible pour l'Admin uniquement (pas de TODO technique
-  // affiché aux joueurs/coachs), pour ne pas oublier de créer le widget et coller son URL.
+  // affiché aux joueurs/coachs), pour ne pas oublier de créer le widget et coller son ID.
   if (session.role !== "Admin") return "";
   return `<div class="card scorenco-widget-todo">
     <div class="section-h" style="margin-bottom:6px;">Calendrier officiel FFHB — ${equipe}</div>
     <div class="muted" style="font-size:11px; line-height:1.5;">
-      À configurer : demande au club s'il existe déjà un compte <b style="color:#fff;">scorenco.com</b>, sinon crée-en un (gratuit), puis crée un widget "Équipe" pour ${equipe} et colle son URL dans le code (<code style="color:#00d4ff;">SCORENCO_WIDGETS</code>).
+      À configurer : demande au club s'il existe déjà un compte <b style="color:#fff;">scorenco.com</b>, sinon crée-en un (gratuit), puis crée un widget "Équipe" pour ${equipe} et donne-moi son identifiant (<code style="color:#00d4ff;">data-widget-id</code>) pour le coller dans <code style="color:#00d4ff;">SCORENCO_WIDGET_IDS</code>.
     </div>
   </div>`;
+}
+
+// Charge le script Score'n'co une seule fois (il scanne la page pour remplir les
+// div .scorenco-widget) — chargé en dehors de #app pour survivre aux reconstructions
+// régulières de l'appli, plutôt que d'être rechargé à chaque rendu.
+function ensureScorencoScript() {
+  if (window.__scorencoScriptLoaded) return;
+  window.__scorencoScriptLoaded = true;
+  const s = document.createElement("script");
+  s.async = true;
+  s.defer = true;
+  s.src = "https://widgets.scorenco.com/host/widgets.js";
+  document.body.appendChild(s);
 }
 
 // Équipes (SM1/U17/SM2) où ce compte est Joueur ou Coach, en tenant compte des comptes liés
@@ -465,7 +487,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-05-13"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-05-14"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
