@@ -252,6 +252,7 @@
   .ev-type.match { background: rgba(47,107,255,0.15); color: var(--accent); }
   .ev-type.entrainement { background: rgba(120,200,80,0.15); color: #78c850; }
   .ev-type.repas { background: rgba(255,180,60,0.15); color: #ffb43c; }
+  .ev-type.soiree { background: rgba(186,120,255,0.15); color: #c084fc; }
   .ev-type.benevole { background: rgba(255,120,73,0.15); color: #ff7849; }
   .ev-type.autre { background: rgba(154,166,196,0.15); color: #9aa6c4; }
   .ev-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
@@ -261,6 +262,7 @@
   .ev-type-big.match { background: rgba(47,107,255,0.18); color: var(--accent); }
   .ev-type-big.entrainement { background: rgba(120,200,80,0.18); color: #78c850; }
   .ev-type-big.repas { background: rgba(255,180,60,0.18); color: #ffb43c; }
+  .ev-type-big.soiree { background: rgba(186,120,255,0.18); color: #c084fc; }
   .ev-type-big.benevole { background: rgba(255,120,73,0.18); color: #ff7849; }
   .ev-type-big.autre { background: rgba(154,166,196,0.18); color: #9aa6c4; }
   .ev-date-full { font-size: 12px; color: #d7dcec; font-weight: 700; margin-bottom: 3px; text-transform: capitalize; }
@@ -402,7 +404,7 @@ const TEAMS = ["SM1", "U17", "SM2"];
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-05-01"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-05-02"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -982,14 +984,20 @@ function isEntrainement(ev) {
 }
 
 // Un Bénévole ne voit jamais les entraînements, seulement les autres types d'événements.
-// Chaque équipe ne voit que ses propres événements ; l'Admin voit tout (toutes équipes).
+// Chaque équipe voit ses propres événements + les événements "Toutes" (club-wide, ex: repas/soirée) ;
+// l'Admin voit tout. Un Salarié (équipe "Toutes") ne voit que les événements club-wide.
 function eventEquipe(ev) {
   return ev[6] || "SM1";
 }
 function getVisibleEvenements() {
   let list = evenements;
   if (session && session.role !== "Admin") {
-    list = list.filter(ev => eventEquipe(ev) === (session.equipe || "SM1"));
+    const myEquipe = session.equipe || "SM1";
+    list = list.filter(ev => {
+      const eq = eventEquipe(ev);
+      if (myEquipe === "Toutes") return eq === "Toutes";
+      return eq === myEquipe || eq === "Toutes";
+    });
   }
   if (session && session.role === "Bénévole") {
     list = list.filter(ev => !isEntrainement(ev));
@@ -1024,7 +1032,12 @@ function rosterForEquipe(equipe) {
 }
 
 function sortedEventsForTeamView(equipeView) {
-  let list = (equipeView === "Toutes") ? evenements : evenements.filter(ev => eventEquipe(ev) === equipeView);
+  let list;
+  if (equipeView === "Toutes") {
+    list = evenements.filter(ev => eventEquipe(ev) === "Toutes");
+  } else {
+    list = evenements.filter(ev => { const eq = eventEquipe(ev); return eq === equipeView || eq === "Toutes"; });
+  }
   if (session.role === "Bénévole") list = list.filter(ev => !isEntrainement(ev));
   return list.slice().sort((a, b) => eventDateObj(a) - eventDateObj(b));
 }
@@ -1464,6 +1477,7 @@ function typeClass(type) {
   if (t.includes("match")) return "match";
   if (t.includes("entra")) return "entrainement";
   if (t.includes("repas")) return "repas";
+  if (t.includes("soir")) return "soiree";
   if (t.includes("benevole") || t.includes("bénévole")) return "benevole";
   return "autre";
 }
@@ -1536,12 +1550,13 @@ function renderGenerateTrainingsForm(equipe) {
 }
 
 function renderAgenda() {
-  const canManage = session.role === "Coach" || session.role === "Admin";
-  const switcherTeams = equipesForSwitcher();
-  const defaultTeam = session.role === "Admin" ? (switcherTeams[0] || "SM1") : (session.equipe || "SM1");
-  const activeTeam = (window.__agendaTeamView && switcherTeams.includes(window.__agendaTeamView)) ? window.__agendaTeamView : defaultTeam;
-  const equipeLabel = `l'équipe ${activeTeam}`;
-  let html = `<div class="page-title">Agenda</div><div class="page-sub">Matchs, entraînements et événements de ${equipeLabel}.</div>`;
+  const isSalarie = session.role === "Salarié";
+  const canManage = session.role === "Coach" || session.role === "Admin" || isSalarie;
+  const switcherTeams = isSalarie ? [] : equipesForSwitcher();
+  const defaultTeam = isSalarie ? "Toutes" : (session.role === "Admin" ? (switcherTeams[0] || "SM1") : (session.equipe || "SM1"));
+  const activeTeam = isSalarie ? "Toutes" : ((window.__agendaTeamView && switcherTeams.includes(window.__agendaTeamView)) ? window.__agendaTeamView : defaultTeam);
+  const equipeLabel = activeTeam === "Toutes" ? "du club (repas, soirées, événements communs)" : `de l'équipe ${activeTeam}`;
+  let html = `<div class="page-title">Agenda</div><div class="page-sub">Matchs, entraînements et événements ${equipeLabel}.</div>`;
 
   if (canManage) {
     html += `<button class="btn add-btn-primary" id="toggle-add-event">${showAddEvent ? "− Fermer" : "+ Ajouter un événement"}</button>`;
@@ -1553,9 +1568,9 @@ function renderAgenda() {
         ${heureSelectHtml("ev-heure", "")}
         <label class="field-label">Type</label>
         <select id="ev-type">
-          <option value="Match">Match</option>
-          <option value="Entraînement">Entraînement</option>
+          ${isSalarie ? "" : `<option value="Match">Match</option><option value="Entraînement">Entraînement</option>`}
           <option value="Repas">Repas</option>
+          <option value="Soirée">Soirée</option>
           <option value="Bénévole">Bénévole</option>
           <option value="Autre">Autre</option>
         </select>
@@ -1563,9 +1578,10 @@ function renderAgenda() {
         <input id="ev-titre" type="text" placeholder="ex: Bischo vs Illkirch" />
         <label class="field-label">Lieu</label>
         <input id="ev-lieu" type="text" value="Lustucru Arena" />
-        ${session.role === "Admin" ? `<label class="field-label">Équipe</label>
+        ${(session.role === "Admin") ? `<label class="field-label">Équipe</label>
         <select id="ev-equipe">
           ${TEAMS.map(t => `<option value="${t}" ${activeTeam === t ? "selected" : ""}>${t}</option>`).join("")}
+          <option value="Toutes" ${activeTeam === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
         </select>` : ""}
         <button class="btn" id="submit-add-event" style="margin-top:4px;">Enregistrer l'événement</button>
       </div>`;
@@ -1574,7 +1590,7 @@ function renderAgenda() {
 
   html += renderTeamSwitcher(switcherTeams, activeTeam, "agenda-team");
 
-  if (session.role === "Admin") {
+  if (session.role === "Admin" && activeTeam !== "Toutes") {
     html += `<button class="add-toggle" id="toggle-generate-trainings" style="border-style:solid; color:#7a8aad;">📅 ${window.__showGenerateTrainings ? "− Fermer" : "Générer les entraînements (mar/jeu)"}</button>`;
     if (window.__showGenerateTrainings) html += renderGenerateTrainingsForm(activeTeam);
   }
@@ -1654,15 +1670,16 @@ function renderEventCard(ev, canManage, isPast) {
       ${heureSelectHtml(`edit-ev-heure-${id}`, heure || "")}
       <label class="field-label">Type</label>
       <select id="edit-ev-type-${id}">
-        ${["Match", "Entraînement", "Repas", "Bénévole", "Autre"].map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${t}</option>`).join("")}
+        ${["Match", "Entraînement", "Repas", "Soirée", "Bénévole", "Autre"].map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${t}</option>`).join("")}
       </select>
       <label class="field-label">Titre</label>
       <input id="edit-ev-titre-${id}" type="text" value="${titre || ''}" />
       <label class="field-label">Lieu</label>
       <input id="edit-ev-lieu-${id}" type="text" value="${lieu || ''}" />
-      ${session.role === "Admin" ? `<label class="field-label">Équipe</label>
+      ${(session.role === "Admin" || session.role === "Salarié") ? `<label class="field-label">Équipe</label>
       <select id="edit-ev-equipe-${id}">
         ${TEAMS.map(t => `<option value="${t}" ${(equipe || "SM1") === t ? "selected" : ""}>${t}</option>`).join("")}
+        <option value="Toutes" ${equipe === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
       </select>` : ""}
       <div class="row-flex" style="margin-top:10px;">
         <button class="btn" style="flex:1;" data-save-event="${id}">Enregistrer</button>
@@ -2098,7 +2115,10 @@ function renderProfilPage() {
     <div class="card" style="flex:1; min-width:0;">
       <div class="section-h">Rôle dans le club</div>
       <div style="display:flex; flex-wrap:wrap; gap:6px;">
-        ${linkedRows.map(r => `<span class="badge">${r[1]} ${r[3] || "SM1"}</span>`).join("")}
+        ${linkedRows.map(r => {
+          const showTeam = r[1] === "Joueur" || r[1] === "Coach";
+          return `<span class="badge">${r[1]}${showTeam ? " " + (r[3] || "SM1") : ""}</span>`;
+        }).join("")}
       </div>
     </div>
     ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
@@ -2155,7 +2175,7 @@ const ACTU_SCOPES = ["Générale", ...TEAMS];
 
 function visibleActualites() {
   let list = actualites;
-  if (session.role !== "Admin") {
+  if (session.role !== "Admin" && session.role !== "Salarié") {
     list = list.filter(a => a[2] === "Générale" || a[2] === (session.equipe || "SM1"));
   }
   return list.slice().sort((a, b) => String(b[5] || "").localeCompare(String(a[5] || "")));
@@ -2168,7 +2188,7 @@ function scopesForActuCreation() {
 }
 
 function actuFilterOptions() {
-  if (session.role === "Admin") return ["Générale", ...TEAMS];
+  if (session.role === "Admin" || session.role === "Salarié") return ["Générale", ...TEAMS];
   return ["Générale", session.equipe || "SM1"];
 }
 
@@ -2772,7 +2792,7 @@ function attachEvents() {
     const titre = document.getElementById("ev-titre").value;
     const lieu = document.getElementById("ev-lieu").value;
     const equipeSelect = document.getElementById("ev-equipe");
-    const equipe = equipeSelect ? equipeSelect.value : (session.equipe || "SM1");
+    const equipe = session.role === "Salarié" ? "Toutes" : (equipeSelect ? equipeSelect.value : (session.equipe || "SM1"));
     if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
     addEvenementApi(date, heure, type, titre, lieu, equipe);
   };
