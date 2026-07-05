@@ -196,6 +196,8 @@
     .ev-day { font-size: 25px; }
     .ev-month { font-size: 11px; }
     .ev-title { font-size: 14px; }
+    .ev-title-big { font-size: 17px; font-weight: 800; }
+    .ev-type-big { font-size: 12.5px; padding: 9px 18px; border-radius: 14px; }
     .ev-date-full { font-size: 13px; }
     .ev-meta { font-size: 12px; }
     .entry-name { font-size: 14px; }
@@ -256,9 +258,9 @@
   .ev-type.benevole { background: rgba(255,120,73,0.15); color: #ff7849; }
   .ev-type.autre { background: rgba(154,166,196,0.15); color: #9aa6c4; }
   .ev-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
-  .ev-header-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
-  .ev-title-big { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -0.2px; flex: 1; min-width: 0; }
-  .ev-type-big { font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 18px; border-radius: 14px; flex-shrink: 0; white-space: nowrap; }
+  .ev-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .ev-title-big { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.1px; flex: 1; min-width: 0; }
+  .ev-type-big { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 9px; border-radius: 12px; flex-shrink: 0; white-space: nowrap; }
   .ev-type-big.match { background: rgba(47,107,255,0.18); color: var(--accent); }
   .ev-type-big.entrainement { background: rgba(120,200,80,0.18); color: #78c850; }
   .ev-type-big.repas { background: rgba(255,180,60,0.18); color: #ffb43c; }
@@ -404,7 +406,8 @@ const TEAMS = ["SM1", "U17", "SM2"];
 const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
-const APP_VERSION = "2026-07-05-03"; // À incrémenter à chaque mise à jour déployée
+const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
+const APP_VERSION = "2026-07-05-05"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -433,7 +436,9 @@ let currentPage = "home";
 let isOnline = false;
 let loginError = "";
 let loginNeedsSetup = null; // null = pas encore vérifié, true/false ensuite
-let loginSelectedNom = "";
+let loginSelectedNom = localStorage.getItem(LAST_USER_KEY) || "";
+let loginPrefilledFromMemory = !!loginSelectedNom;
+let loginSearchQuery = "";
 let loginNoms = null; // [{nom, role}, ...] chargé avant connexion, remplace la liste figée PLAYERS pour le menu
 let showAddEvent = false;
 
@@ -500,9 +505,11 @@ function isFormOpen() {
 
 async function fetchAll() {
   try {
-    const res = await fetch(GOOGLE_SCRIPT_URL + "?action=getAll");
+    const params = new URLSearchParams({ action: "getAll", authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     if (!res.ok) throw new Error("bad response");
     const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "auth");
     grid = parseSheetData(data.grid);
     comptes = data.comptes || [];
     presences = parsePresences(data.presences || []);
@@ -769,6 +776,7 @@ async function setInitialCode(nom, newCode) {
     if (data.ok) {
       session = { nom, role: String(data.role || "").trim(), code: newCode, equipe: String(data.equipe || "SM1").trim() };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(LAST_USER_KEY, nom);
       currentPage = "home";
       await fetchAll();
     } else if (data.error === "already_set") {
@@ -793,6 +801,7 @@ async function tryLogin(nom, code) {
     if (data.ok) {
       session = { nom, role: String(data.role || "").trim(), code, equipe: String(data.equipe || "SM1").trim() };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(LAST_USER_KEY, nom);
       currentPage = "home";
       await fetchAll();
     } else {
@@ -1321,25 +1330,48 @@ function renderLogin() {
     <div class="login-title">LustuZone</div>
     <div class="login-subtitle">App de Gestion</div>
     <label class="field-label">Ton nom</label>
+    <input id="login-search" type="text" placeholder="Rechercher un nom..." value="${escapeHtml(loginSearchQuery)}" style="margin-bottom:8px;" />
     <select id="login-nom">
       <option value="">-- Choisir --</option>
-      ${loginNoms
-        ? loginNoms.map(c => `<option value="${c.nom}" ${c.nom === loginSelectedNom ? "selected" : ""}>${c.nom}</option>`).join("")
-        : [...PLAYERS, "Coach", "Admin", "Bénévole"].map(p => `<option value="${p}" ${p === loginSelectedNom ? "selected" : ""}>${p}</option>`).join("")}
+      ${(() => {
+        const allNoms = loginNoms ? loginNoms.map(c => c.nom) : [...PLAYERS, "Coach", "Admin", "Bénévole"];
+        const q = loginSearchQuery.trim().toLowerCase();
+        const filtered = q ? allNoms.filter(n => n.toLowerCase().includes(q)) : allNoms;
+        if (filtered.length === 0) return `<option value="" disabled>Aucun résultat</option>`;
+        return filtered.map(n => `<option value="${n}" ${n === loginSelectedNom ? "selected" : ""}>${n}</option>`).join("");
+      })()}
     </select>
     ${formHtml}
+    ${loginPrefilledFromMemory && loginSelectedNom ? `<div class="muted" id="login-change-account" style="margin-top:12px; cursor:pointer; text-decoration:underline;">Ce n'est pas moi — changer de compte</div>` : ""}
     ${loginError ? `<div class="login-error">${loginError}</div>` : ""}
   </div></div></div>`;
 }
 
 function attachLoginEvents() {
+  const searchInput = document.getElementById("login-search");
+  if (searchInput) searchInput.oninput = (e) => {
+    loginSearchQuery = e.target.value;
+    render();
+  };
+
   const nomSelect = document.getElementById("login-nom");
   if (nomSelect) nomSelect.onchange = (e) => {
     loginSelectedNom = e.target.value;
+    loginPrefilledFromMemory = false;
     loginNeedsSetup = null;
     loginError = "";
     render();
     if (loginSelectedNom) checkAccountStatus(loginSelectedNom);
+  };
+
+  const changeAccount = document.getElementById("login-change-account");
+  if (changeAccount) changeAccount.onclick = () => {
+    loginSelectedNom = "";
+    loginPrefilledFromMemory = false;
+    loginNeedsSetup = null;
+    loginError = "";
+    localStorage.removeItem(LAST_USER_KEY);
+    render();
   };
 
   const btn = document.getElementById("login-btn");
@@ -3140,7 +3172,10 @@ async function fetchLoginNoms() {
 grid = initGrid();
 render();
 if (session) startPolling();
-else fetchLoginNoms();
+else {
+  fetchLoginNoms();
+  if (loginSelectedNom) checkAccountStatus(loginSelectedNom);
+}
 </script>
 </body>
 </html>
