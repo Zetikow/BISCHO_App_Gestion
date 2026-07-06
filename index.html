@@ -672,7 +672,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-06-09"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-06-10"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -2528,10 +2528,32 @@ function renderStatsRecapCard(postes) {
 
 function renderPushNotifCard() {
   if (!ONESIGNAL_APP_ID) return "";
+  const perm = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
+
+  let statusHtml, showButton = true;
+  if (perm === "granted") {
+    statusHtml = `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:rgba(51,209,122,0.15); border-radius:9px; margin-bottom:8px;">
+      <span style="font-size:16px;">✅</span>
+      <span style="font-size:11px; color:#33d17a; font-weight:700;">Notifications activées sur cet appareil</span>
+    </div>`;
+    showButton = false;
+  } else if (perm === "denied") {
+    statusHtml = `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:rgba(255,107,107,0.15); border-radius:9px; margin-bottom:8px;">
+      <span style="font-size:16px;">🚫</span>
+      <span style="font-size:11px; color:#ff6b6b; font-weight:700;">Bloquées — à réactiver dans les réglages du navigateur (icône cadenas à côté de l'adresse du site)</span>
+    </div>`;
+    showButton = false;
+  } else if (perm === "unsupported") {
+    statusHtml = `<div class="muted" style="font-size:10.5px; margin-bottom:8px;">Non disponible sur ce navigateur.</div>`;
+    showButton = false;
+  } else {
+    statusHtml = `<div class="muted" style="font-size:10.5px; margin-bottom:8px; line-height:1.5;">Active les notifications pour recevoir les rappels de présence directement sur ton téléphone.</div>`;
+  }
+
   return `<div class="card">
     <div class="section-h">Notifications push</div>
-    <div class="muted" style="font-size:10.5px; margin-bottom:8px; line-height:1.5;">Active les notifications pour recevoir les rappels de présence directement sur ton téléphone.</div>
-    <button class="btn" id="activer-push-btn">🔔 Activer les notifications</button>
+    ${statusHtml}
+    ${showButton ? `<button class="btn" id="activer-push-btn">🔔 Activer les notifications</button>` : ""}
   </div>`;
 }
 
@@ -3056,10 +3078,8 @@ function attachEvents() {
       try {
         await OneSignal.login(session.nom);
         await OneSignal.Notifications.requestPermission();
-        alert("Demande envoyée — regarde s'il y a une fenêtre d'autorisation à valider en haut de ton navigateur.");
-      } catch (err) {
-        alert("Erreur lors de l'activation des notifications.");
-      }
+      } catch (err) { /* on affichera quand même l'état réel juste après */ }
+      render(); // remet à jour la carte selon Notification.permission, quel que soit le choix fait
     });
   };
 
