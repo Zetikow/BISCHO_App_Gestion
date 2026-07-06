@@ -453,9 +453,28 @@ function syncOneSignalLogin() {
       if (session && session.nom) {
         await OneSignal.login(session.nom);
         await OneSignal.Notifications.requestPermission();
+        // L'alias externalId de OneSignal.login() n'est pas toujours fiable pour cibler
+        // l'envoi (problème connu chez eux) — on récupère et enregistre en plus l'identifiant
+        // technique réel de l'abonnement de cet appareil, bien plus fiable pour l'envoi ciblé.
+        const existingId = OneSignal.User.PushSubscription.id;
+        if (existingId) {
+          savePushSubscriptionId(existingId);
+        } else {
+          OneSignal.User.PushSubscription.addEventListener("change", (event) => {
+            if (event && event.current && event.current.id) savePushSubscriptionId(event.current.id);
+          });
+        }
       }
     } catch (err) { /* navigateur non compatible ou refus — sans gravité */ }
   });
+}
+
+async function savePushSubscriptionId(subId) {
+  if (!session || !session.nom || !subId) return;
+  try {
+    const params = new URLSearchParams({ action: "setPushSubscriptionId", nom: session.nom, subId, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+  } catch (err) { /* pas grave, sera retenté à la prochaine connexion */ }
 }
 
 // L'email de relance reste en base (Comptes colonne Email) mais son interface est masquée
@@ -672,7 +691,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-06-10"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-06-11"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -3074,13 +3093,8 @@ function attachEvents() {
   const activerPushBtn = document.getElementById("activer-push-btn");
   if (activerPushBtn) activerPushBtn.onclick = () => {
     if (!window.OneSignalDeferred) { alert("Les notifications ne sont pas disponibles sur ce navigateur."); return; }
-    window.OneSignalDeferred.push(async function (OneSignal) {
-      try {
-        await OneSignal.login(session.nom);
-        await OneSignal.Notifications.requestPermission();
-      } catch (err) { /* on affichera quand même l'état réel juste après */ }
-      render(); // remet à jour la carte selon Notification.permission, quel que soit le choix fait
-    });
+    syncOneSignalLogin();
+    setTimeout(render, 1200); // laisse le temps à la popup d'autorisation d'être traitée
   };
 
   const submitProfilEmail = document.getElementById("submit-profil-email");

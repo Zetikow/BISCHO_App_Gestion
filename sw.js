@@ -7,7 +7,7 @@ importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDKWorker.js");
 // IMPORTANT : incrémente ce numéro à chaque mise à jour déployée de l'appli.
 // Ça force le renouvellement du cache ET (via APP_VERSION dans index.html)
 // la déconnexion de tous les utilisateurs pour qu'ils rechargent la dernière version.
-const CACHE_NAME = "caisse-noire-v2026-07-06-10";
+const CACHE_NAME = "caisse-noire-v2026-07-06-11";
 const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
