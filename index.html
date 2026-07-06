@@ -649,7 +649,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-06-05"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-06-06"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -741,7 +741,7 @@ function escapeHtml(str) {
 }
 
 function isFormOpen() {
-  return !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined) || !!window.__showAddActualite || !!window.__cnEditPlayer || !!window.__showSalariesAdd || !!window.__salariesPreviewFile || !!window.__salariesUploading;
+  return !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined) || !!window.__showAddActualite || !!window.__cnEditPlayer || !!window.__showSalariesAdd || !!window.__salariesPreviewFile || !!window.__salariesUploading || !!window.__profilEmailEditing;
 }
 
 async function fetchAll() {
@@ -1033,6 +1033,17 @@ async function setPosteApi(nom, poste) {
   render();
   try {
     await fetch(`${GOOGLE_SCRIPT_URL}?action=setPoste&nom=${encodeURIComponent(nom)}&poste=${encodeURIComponent(poste)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    isOnline = true;
+  } catch (err) { isOnline = false; render(); }
+}
+
+async function setEmailApi(nom, email) {
+  const row = findCompteRow(nom);
+  if (row) row[8] = email; // mise à jour optimiste locale
+  window.__profilEmailEditing = false;
+  render();
+  try {
+    await fetch(`${GOOGLE_SCRIPT_URL}?action=setEmail&nom=${encodeURIComponent(nom)}&email=${encodeURIComponent(email)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     isOnline = true;
   } catch (err) { isOnline = false; render(); }
 }
@@ -1737,6 +1748,18 @@ function renderHome() {
     html += `<div class="page-title">${headline}</div><div class="page-sub">${sub}</div>`;
   } else {
     html += `<div class="page-title">Salut ${session.nom}</div><div class="page-sub">Aucun événement prévu pour le moment.</div>`;
+  }
+
+  const myRowForEmail = findCompteRow(session.nom);
+  const myEmail = myRowForEmail ? (myRowForEmail[8] || "") : "";
+  if (!myEmail) {
+    html += `<div class="card" style="border-color: rgba(255,180,60,0.4); background: linear-gradient(135deg, rgba(255,180,60,0.12), rgba(17,20,31,0.4));">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-size:20px;">📧</div>
+        <div style="flex:1; font-size:11.5px; color:#e8e8ee; line-height:1.5;">Merci de renseigner votre adresse mail pour avoir les relances de présence à remplir.</div>
+      </div>
+      <button class="btn" style="margin-top:10px; margin-bottom:0;" data-goto-profil-email="1">Renseigner mon adresse mail</button>
+    </div>`;
   }
 
   html += renderNextEventCard();
@@ -2474,6 +2497,30 @@ function renderStatsRecapCard(postes) {
   </div>`;
 }
 
+function renderEmailCard(myRow) {
+  const email = myRow ? (myRow[8] || "") : "";
+  const editing = !!window.__profilEmailEditing;
+  if (!email || editing) {
+    return `<div class="card">
+      <div class="section-h">Adresse mail de relance</div>
+      <div class="muted" style="font-size:10.5px; margin-bottom:8px; line-height:1.5;">Utilisée pour les rappels par mail (présence à remplir, échéances...) — à définir une fois pour toutes.</div>
+      <input id="profil-email-input" type="email" placeholder="ton.email@exemple.com" value="${escapeHtml(email)}" />
+      <div class="row-flex" style="margin-top:8px;">
+        <button class="btn" style="flex:1;" id="submit-profil-email">Enregistrer</button>
+        ${editing ? `<button class="btn secondary" style="flex:1;" id="cancel-profil-email">Annuler</button>` : ""}
+      </div>
+    </div>`;
+  }
+  return `<div class="card">
+    <div class="section-h">Adresse mail de relance</div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div style="flex:1; font-size:12.5px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(email)}</div>
+      <button class="justif-edit-btn" id="edit-profil-email">Modifier</button>
+      <button class="justif-edit-btn" id="delete-profil-email">Supprimer</button>
+    </div>
+  </div>`;
+}
+
 function renderProfilPage() {
   const myRow = findCompteRow(session.nom);
   const personne = myRow ? (myRow[4] || myRow[0]) : session.nom;
@@ -2514,6 +2561,8 @@ function renderProfilPage() {
     </div>
     ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
   </div>`;
+
+  html += renderEmailCard(myRow);
 
   if (showVueToggle) {
     html += `<div class="team-switch-row">
@@ -2954,6 +3003,29 @@ function attachEvents() {
     const postes = currentPostes();
     postes.push(newVal);
     setPosteApi(session.nom, postes.join(","));
+  };
+
+  document.querySelectorAll("[data-goto-profil-email]").forEach(el => {
+    el.onclick = () => { vibrate(); currentPage = "profil"; render(); };
+  });
+
+  const submitProfilEmail = document.getElementById("submit-profil-email");
+  if (submitProfilEmail) submitProfilEmail.onclick = () => {
+    const val = (document.getElementById("profil-email-input").value || "").trim();
+    if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { alert("Merci de renseigner une adresse mail valide."); return; }
+    setEmailApi(session.nom, val);
+  };
+
+  const editProfilEmail = document.getElementById("edit-profil-email");
+  if (editProfilEmail) editProfilEmail.onclick = () => { window.__profilEmailEditing = true; render(); };
+
+  const cancelProfilEmail = document.getElementById("cancel-profil-email");
+  if (cancelProfilEmail) cancelProfilEmail.onclick = () => { window.__profilEmailEditing = false; render(); };
+
+  const deleteProfilEmail = document.getElementById("delete-profil-email");
+  if (deleteProfilEmail) deleteProfilEmail.onclick = () => {
+    if (!confirm("Supprimer ton adresse mail de relance ?")) return;
+    setEmailApi(session.nom, "");
   };
 
   document.querySelectorAll("[data-profil-vue]").forEach(el => {
