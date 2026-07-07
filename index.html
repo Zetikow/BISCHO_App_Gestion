@@ -337,6 +337,13 @@
   .matchcard-badge.loss { background: rgba(255,107,107,0.15); color: #ff6b6b; }
   .matchcard-badge.pending { background: rgba(154,166,196,0.12); color: #9aa6c4; }
   .matchcard-badge.upcoming { background: rgba(0,212,255,0.15); color: #00d4ff; }
+  .matchcard-photo-btn { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 9px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .back-link { background: none; border: none; color: #7fa8ff; font-size: 11.5px; font-weight: 700; padding: 0; margin-bottom: 10px; display: inline-block; }
+  .gallery-match-row { display: flex; align-items: center; gap: 10px; padding: 11px 10px; border-radius: 10px; }
+  .gallery-match-row:active { background: rgba(255,255,255,0.06); }
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .photo-grid-item { aspect-ratio: 1; border-radius: 10px; overflow: hidden; display: block; background: #11141f; }
+  .photo-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
   @keyframes qaFadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
   .add-form input, .add-form select { margin-bottom: 6px; }
   .add-form .field-label { margin: 8px 0 4px; }
@@ -546,7 +553,10 @@ function renderResultsWidget(equipe) {
 
   const rows = [...past.map(ev => renderMatchCard(ev, true)), ...upcoming.map(ev => renderMatchCard(ev, false))];
   return `<div class="card matchcard-wrap">
-    <div class="section-h" style="margin-bottom:8px;">🤾 Résultats & prochains matchs — ${equipe}</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <div class="section-h" style="margin-bottom:0;">🤾 Résultats & prochains matchs — ${equipe}</div>
+      <button class="btn secondary" style="width:auto; padding:6px 12px; font-size:9.5px; margin:0;" data-goto-gallery="${escapeHtml(equipe)}">📷 Photos</button>
+    </div>
     ${rows.join("")}
   </div>`;
 }
@@ -556,7 +566,7 @@ function teamAvatarLabel(name) {
 }
 
 function renderMatchCard(ev, isPast) {
-  const [, , heure, , titre, lieu, , score] = ev;
+  const [, date, heure, , titre, lieu, equipeRaw, score] = ev;
   const d = eventDateObj(ev);
   const dateLabel = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }).replace(".", "").toUpperCase();
   const m = formatMatchDisplay(titre, lieu);
@@ -565,6 +575,7 @@ function renderMatchCard(ev, isPast) {
   const awayName = showSplit ? m.away : "";
   const homeIsUs = m.home === "Bischo";
   const awayIsUs = m.away === "Bischo";
+  const photoBtn = `<button class="matchcard-photo-btn" data-open-match-photos="${escapeHtml(date)}|||${escapeHtml(titre)}|||${escapeHtml(equipeRaw || "SM1")}" title="Voir les photos">📷</button>`;
 
   const sideHtml = (name, isUs) => `<div class="matchcard-side">
     <div class="matchcard-avatar ${isUs ? "us" : ""}">${escapeHtml(teamAvatarLabel(name))}</div>
@@ -590,6 +601,7 @@ function renderMatchCard(ev, isPast) {
           ${sideHtml(awayName, awayIsUs)}
         </div>
         <div class="matchcard-badge ${outcome}">${outcomeIcon} ${outcomeLabel}</div>
+        ${photoBtn}
       </div>`;
     }
   }
@@ -620,6 +632,145 @@ function renderMatchCard(ev, isPast) {
   </div>`;
 }
 
+// ===================== EXPORT CALENDRIER (.ics) =====================
+function pad2(n) { return String(n).padStart(2, "0"); }
+function formatICSDate(d) {
+  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+}
+function escapeICS(text) {
+  return String(text || "").replace(/[\\,;]/g, m => "\\" + m).replace(/\n/g, "\\n");
+}
+
+function exportCalendarICS() {
+  const myTeams = myAllowedEquipes();
+  const relevant = evenements.filter(ev => myTeams.includes(eventEquipe(ev)) || eventEquipe(ev) === "Toutes");
+  if (relevant.length === 0) { alert("Aucun événement à exporter pour le moment."); return; }
+
+  let ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//LustuZone//FR\r\nCALSCALE:GREGORIAN\r\n";
+  relevant.forEach(ev => {
+    const [id, , , type, titre, lieu] = ev;
+    const d = eventDateObj(ev);
+    const end = new Date(d.getTime() + 2 * 60 * 60 * 1000); // durée par défaut : 2h
+    const displayTitre = typeClass(type) === "match" ? formatMatchDisplay(titre, lieu).label : (titre || type || "Événement");
+    ics += "BEGIN:VEVENT\r\n";
+    ics += `UID:${id}@lustuzone\r\n`;
+    ics += `DTSTAMP:${formatICSDate(new Date())}\r\n`;
+    ics += `DTSTART:${formatICSDate(d)}\r\n`;
+    ics += `DTEND:${formatICSDate(end)}\r\n`;
+    ics += `SUMMARY:${escapeICS(displayTitre)}\r\n`;
+    if (lieu) ics += `LOCATION:${escapeICS(lieu)}\r\n`;
+    ics += "END:VEVENT\r\n";
+  });
+  ics += "END:VCALENDAR\r\n";
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lustuzone-calendrier.ics";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ===================== GALERIE PHOTOS =====================
+let photoViewState = { loading: false, loaded: false, error: null, photos: [], folderName: "" };
+const photoViewCache = {};
+
+async function fetchPhotosForMatch(equipe, date, titre) {
+  const cacheKey = `${equipe}__${date}__${titre}`;
+  const cached = photoViewCache[cacheKey];
+  if (cached) {
+    photoViewState = { loading: false, loaded: true, error: null, photos: cached.photos, folderName: cached.folderName };
+    render();
+  } else {
+    photoViewState = { loading: true, loaded: false, error: null, photos: [], folderName: "" };
+    render();
+  }
+  try {
+    const params = new URLSearchParams({ action: "photosListForMatch", equipe, date, titre, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) {
+      photoViewCache[cacheKey] = { photos: data.photos, folderName: data.folderName };
+      photoViewState = { loading: false, loaded: true, error: null, photos: data.photos, folderName: data.folderName };
+    } else {
+      photoViewState = { loading: false, loaded: true, error: "Impossible de charger les photos.", photos: [], folderName: "" };
+    }
+  } catch (err) {
+    if (!cached) photoViewState = { loading: false, loaded: true, error: "Connexion impossible.", photos: [], folderName: "" };
+  }
+  render();
+}
+
+function goToGallery(equipe) {
+  window.__galleryEquipe = equipe;
+  currentPage = "gallery";
+  render();
+}
+
+function goToPhotoView(equipe, date, titre) {
+  window.__photoViewMatch = { equipe, date, titre };
+  currentPage = "photoview";
+  fetchPhotosForMatch(equipe, date, titre);
+}
+
+function renderGalleryPage() {
+  const equipe = window.__galleryEquipe || "SM1";
+  const matches = evenements.filter(ev => typeClass(ev[3]) === "match" && (eventEquipe(ev) === equipe || eventEquipe(ev) === "Toutes"))
+    .sort((a, b) => eventDateObj(b) - eventDateObj(a));
+
+  let html = `<button class="back-link" data-goto-page="home">← Retour à l'accueil</button>`;
+  html += `<div class="page-title">Galerie photos</div><div class="page-sub">Équipe ${escapeHtml(equipe)}</div>`;
+
+  if (matches.length === 0) {
+    html += `<div class="card"><div class="muted">Aucun match enregistré pour cette équipe pour le moment.</div></div>`;
+    return html;
+  }
+
+  html += `<div class="card" style="padding:6px;">`;
+  matches.forEach(ev => {
+    const [, date, , , titre, lieu] = ev;
+    const d = eventDateObj(ev);
+    const dateLabel = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }).replace(".", "").toUpperCase();
+    const m = formatMatchDisplay(titre, lieu);
+    html += `<div class="gallery-match-row" data-open-match-photos="${escapeHtml(date)}|||${escapeHtml(titre)}|||${escapeHtml(equipe)}">
+      <div class="matchcard-date" style="width:52px; flex-shrink:0;">${dateLabel}</div>
+      <div style="flex:1; font-size:12px; font-weight:700; color:#e8e8ee;">${escapeHtml(m.label)}</div>
+      <div style="font-size:16px;">📷</div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderPhotoViewPage() {
+  const match = window.__photoViewMatch || {};
+  const m = formatMatchDisplay(match.titre, "");
+  let html = `<button class="back-link" data-goto-page="gallery">← Retour à la galerie</button>`;
+  html += `<div class="page-title">${escapeHtml(m.label || match.titre || "Match")}</div><div class="page-sub">${escapeHtml(photoViewState.folderName || "")}</div>`;
+
+  if (photoViewState.loading && !photoViewState.loaded) {
+    html += `<div class="card"><div class="muted">Chargement des photos…</div></div>`;
+    return html;
+  }
+  if (photoViewState.error) {
+    html += `<div class="card"><div class="muted">${escapeHtml(photoViewState.error)}</div></div>`;
+    return html;
+  }
+  if (photoViewState.photos.length === 0) {
+    html += `<div class="card"><div class="muted">Aucune photo pour ce match pour le moment. Dépose-les directement dans le dossier Google Drive correspondant.</div></div>`;
+    return html;
+  }
+  html += `<div class="photo-grid">`;
+  photoViewState.photos.forEach(p => {
+    html += `<a href="${escapeHtml(p.viewUrl)}" target="_blank" rel="noopener" class="photo-grid-item"><img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}" loading="lazy"/></a>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
 // Équipes (SM1/U17/SM2) où ce compte est Joueur ou Coach — la session cumule déjà tous les
 // rôles liés automatiquement, plus besoin de recalculer via les comptes/"Personne".
 function myScorencoTeams() {
@@ -643,7 +794,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-07-03"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-07-05"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -1513,6 +1664,8 @@ function render() {
   else if (currentPage === "profil") html += renderProfilPage();
   else if (currentPage === "actualites") html += renderActualitesPage();
   else if (currentPage === "salaries") html += renderSalariesPage();
+  else if (currentPage === "gallery") html += renderGalleryPage();
+  else if (currentPage === "photoview") html += renderPhotoViewPage();
 
   html += `<div class="bottom-nav">`;
   html += mainTabs.map(t =>
@@ -1964,7 +2117,10 @@ function renderGenerateTrainingsForm(equipe) {
 }
 
 function renderAgenda() {
-  const isSalarie = hasRole("Salarié");
+  // "Salarié pur" = sans autre rôle lié à une équipe (Joueur/Coach/Admin). Un compte qui cumule
+  // Salarié + un autre rôle (ex: Joueur SM1 + Coach U17 + Admin + Salarié) garde son accès complet
+  // aux équipes — seul un Salarié sans aucun autre rôle est cantonné à la vue "Toutes équipes".
+  const isSalarie = hasRole("Salarié") && !hasRole("Joueur") && !hasRole("Coach") && !hasRole("Admin");
   const canManage = hasRole("Coach") || hasRole("Admin") || isSalarie;
   const switcherTeams = isSalarie ? [] : equipesForSwitcher();
   const defaultTeam = isSalarie ? "Toutes" : (hasRole("Admin") ? (switcherTeams[0] || "SM1") : (primaryEquipe()));
@@ -2012,6 +2168,12 @@ function renderAgenda() {
   }
 
   html += renderTeamSwitcher(switcherTeams, activeTeam, "agenda-team");
+
+  html += `<div class="card">
+    <div class="section-h" style="margin-top:0;">Ton calendrier</div>
+    <div class="muted" style="font-size:10.5px; margin-bottom:10px; line-height:1.5;">Exporte tes matchs et entraînements pour les ajouter à l'agenda de ton téléphone.</div>
+    <button class="btn" id="export-calendar-btn">📅 Exporter mon calendrier (.ics)</button>
+  </div>`;
 
   if (hasRole("Admin") && activeTeam !== "Toutes") {
     html += `<button class="add-toggle" id="toggle-generate-trainings" style="border-style:solid; color:#7a8aad;">📅 ${window.__showGenerateTrainings ? "− Fermer" : "Générer les entraînements (mar/jeu)"}</button>`;
@@ -3044,6 +3206,25 @@ function attachEvents() {
     el.onclick = () => { vibrate(); currentPage = "profil"; render(); };
   });
 
+  document.querySelectorAll("[data-goto-gallery]").forEach(el => {
+    el.onclick = () => { vibrate(); goToGallery(el.dataset.gotoGallery); };
+  });
+
+  const exportCalendarBtn = document.getElementById("export-calendar-btn");
+  if (exportCalendarBtn) exportCalendarBtn.onclick = () => { vibrate(); exportCalendarICS(); };
+
+  document.querySelectorAll("[data-goto-page]").forEach(el => {
+    el.onclick = () => { vibrate(); currentPage = el.dataset.gotoPage; render(); };
+  });
+
+  document.querySelectorAll("[data-open-match-photos]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      const [date, titre, equipe] = el.dataset.openMatchPhotos.split("|||");
+      goToPhotoView(equipe, date, titre);
+    };
+  });
+
   const submitProfilEmail = document.getElementById("submit-profil-email");
   if (submitProfilEmail) submitProfilEmail.onclick = () => {
     const val = (document.getElementById("profil-email-input").value || "").trim();
@@ -3357,7 +3538,7 @@ function attachEvents() {
     }
     const lieu = document.getElementById("ev-lieu").value;
     const equipeSelect = document.getElementById("ev-equipe");
-    const equipe = hasRole("Salarié") ? "Toutes" : (equipeSelect ? equipeSelect.value : (primaryEquipe()));
+    const equipe = equipeSelect ? equipeSelect.value : (hasRole("Salarié") ? "Toutes" : primaryEquipe());
     if (!date || !titre) { alert("Merci de renseigner au moins la date complète et le titre."); return; }
     addEvenementApi(date, heure, type, titre, lieu, equipe);
   };
