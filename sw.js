@@ -1,13 +1,7 @@
-// Notifications push : on importe le code de gestion push de OneSignal directement dans notre
-// propre service worker (plutôt qu'un fichier séparé) — c'est la méthode officielle recommandée
-// quand un site a déjà son propre service worker. N'a aucun effet tant qu'aucun App ID n'est
-// configuré côté index.html/apps-script.js.
-importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDKWorker.js");
-
 // IMPORTANT : incrémente ce numéro à chaque mise à jour déployée de l'appli.
 // Ça force le renouvellement du cache ET (via APP_VERSION dans index.html)
 // la déconnexion de tous les utilisateurs pour qu'ils rechargent la dernière version.
-const CACHE_NAME = "caisse-noire-v2026-07-07-02";
+const CACHE_NAME = "caisse-noire-v2026-07-07-03";
 const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
@@ -33,7 +27,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (url.origin.includes("firebaseio.com") || url.origin.includes("googleapis.com") || url.origin.includes("gstatic.com") || url.origin.includes("script.google.com") || url.origin.includes("onesignal.com")) {
+  if (url.origin.includes("firebaseio.com") || url.origin.includes("googleapis.com") || url.origin.includes("gstatic.com") || url.origin.includes("script.google.com")) {
     return;
   }
 

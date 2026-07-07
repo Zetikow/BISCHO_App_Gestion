@@ -440,58 +440,7 @@ const ACTIONS = [
 const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S.","Romain J.","Volodia M.","Victor P.","Mattéo MP.","Gabriel W.","Basil L.","Brahim I.","Maximilien M.","Arthur M.","Damien P.","Alexis W.","Mathieu S.","Nicolas Z.","Robin S."];
 const TEAMS = ["SM1", "U17", "SM2"];
 
-// Colle ici l'App ID de ton compte OneSignal (gratuit, onesignal.com) une fois créé, pour
-// activer les notifications push. Laisse vide "" tant que ce n'est pas fait : le reste du
-// code se met simplement en veille sans erreur.
-const ONESIGNAL_APP_ID = "99687019-febd-4388-b5b7-bb1f4545b15a";
-const ONESIGNAL_SAFARI_WEB_ID = "web.onesignal.auto.1ad4c923-47e5-493e-8349-b8f3b81ccfd9";
-
-function syncOneSignalLogin() {
-  if (!ONESIGNAL_APP_ID || !window.OneSignalDeferred) return;
-  window.OneSignalDeferred.push(async function (OneSignal) {
-    try {
-      // Important pour Safari/iOS : la demande d'autorisation doit être le tout premier appel
-      // asynchrone après le clic, sinon Safari considère qu'elle ne vient plus d'un geste
-      // utilisateur direct et l'ignore silencieusement (contrairement à Chrome, plus tolérant).
-      await OneSignal.Notifications.requestPermission();
-      if (session && session.nom) {
-        await OneSignal.login(session.nom);
-        attemptCapturePushSubId(OneSignal, 0);
-      }
-    } catch (err) {
-      window.__pushDebug = "Erreur OneSignal : " + err;
-      render();
-    }
-  });
-}
-
-function attemptCapturePushSubId(OneSignal, tries) {
-  let id = null;
-  try { id = OneSignal.User.PushSubscription.id; } catch (err) { /* champ pas encore prêt */ }
-  window.__pushDebug = `Tentative ${tries + 1}/6 — id détecté : ${id || "aucun"}`;
-  render();
-  if (id) {
-    savePushSubscriptionId(id);
-    window.__pushDebug = "Identifiant enregistré : " + id;
-    render();
-  } else if (tries < 5) {
-    setTimeout(() => attemptCapturePushSubId(OneSignal, tries + 1), 1200);
-  } else {
-    window.__pushDebug = "Aucun identifiant détecté après plusieurs tentatives. Optin OneSignal : " + (OneSignal.User.PushSubscription.optedIn === true ? "oui" : "non/inconnu");
-    render();
-  }
-}
-
-async function savePushSubscriptionId(subId) {
-  if (!session || !session.nom || !subId) return;
-  try {
-    const params = new URLSearchParams({ action: "setPushSubscriptionId", nom: session.nom, subId, authNom: session.nom, authCode: session.code });
-    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
-  } catch (err) { /* pas grave, sera retenté à la prochaine connexion */ }
-}
-
-// L'email de relance reste en base (Comptes colonne Email) mais son interface est masquée
-// pour le moment, au profit des notifications push. Repasser à true pour la remontrer.
+// Adresse mail de relance visible sur Profil/Accueil pour permettre aux joueurs de la renseigner.
 const EMAIL_REMINDER_UI_VISIBLE = true;
 
 
@@ -694,7 +643,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-07-02"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-07-03"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -1141,7 +1090,6 @@ async function setInitialCode(nom, newCode) {
       session = { nom, code: newCode, roles: data.roles || [] };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       localStorage.setItem(LAST_USER_KEY, nom);
-      syncOneSignalLogin();
       currentPage = "home";
       await fetchAll();
     } else if (data.error === "already_set") {
@@ -1167,7 +1115,6 @@ async function tryLogin(nom, code) {
       session = { nom, code, roles: data.roles || [] };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       localStorage.setItem(LAST_USER_KEY, nom);
-      syncOneSignalLogin();
       currentPage = "home";
       await fetchAll();
     } else {
@@ -2591,45 +2538,6 @@ function renderStatsRecapCard(postes) {
   </div>`;
 }
 
-function renderPushNotifCard() {
-  if (!ONESIGNAL_APP_ID) return "";
-  const perm = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
-  const sdkQueued = !!window.OneSignalDeferred;
-  const sdkLoaded = !!window.OneSignal;
-  const sdkLine = sdkLoaded
-    ? `<div class="muted" style="font-size:9px; margin-bottom:8px;">Service de notifications : chargé ✓</div>`
-    : `<div class="muted" style="font-size:9px; margin-bottom:8px; color:#ffb43c;">Service de notifications : ${sdkQueued ? "pas encore chargé (patiente quelques secondes puis rafraîchis)" : "bloqué — vérifie qu'aucun bloqueur de publicités n'est actif sur ce site"}</div>`;
-
-  let statusHtml, showButton = true;
-  if (perm === "granted") {
-    statusHtml = `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:rgba(51,209,122,0.15); border-radius:9px; margin-bottom:8px;">
-      <span style="font-size:16px;">✅</span>
-      <span style="font-size:11px; color:#33d17a; font-weight:700;">Notifications activées sur cet appareil</span>
-    </div>
-    ${window.__pushDebug ? `<div class="muted" style="font-size:9.5px; margin-bottom:8px;">${escapeHtml(window.__pushDebug)}</div>` : ""}`;
-    showButton = false;
-  } else if (perm === "denied") {
-    statusHtml = `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:rgba(255,107,107,0.15); border-radius:9px; margin-bottom:8px;">
-      <span style="font-size:16px;">🚫</span>
-      <span style="font-size:11px; color:#ff6b6b; font-weight:700;">Bloquées — à réactiver dans les réglages du navigateur (icône cadenas à côté de l'adresse du site)</span>
-    </div>`;
-    showButton = false;
-  } else if (perm === "unsupported") {
-    statusHtml = `<div class="muted" style="font-size:10.5px; margin-bottom:8px;">Non disponible sur ce navigateur.</div>`;
-    showButton = false;
-  } else {
-    statusHtml = `<div class="muted" style="font-size:10.5px; margin-bottom:8px; line-height:1.5;">Active les notifications pour recevoir les rappels de présence directement sur ton téléphone.</div>`;
-  }
-
-  return `<div class="card">
-    <div class="section-h">Notifications push</div>
-    ${sdkLine}
-    ${statusHtml}
-    ${showButton ? `<button class="btn" id="activer-push-btn">🔔 Activer les notifications</button>` : ""}
-    ${(perm === "granted") ? `<button class="btn secondary" id="resync-push-btn" style="margin-top:6px;">↻ Resynchroniser</button>` : ""}
-  </div>`;
-}
-
 function renderEmailCard(myRow) {
   const email = myRow ? (myRow[6] || "") : "";
   const editing = !!window.__profilEmailEditing;
@@ -2678,7 +2586,6 @@ function renderProfilPage() {
     ${!photoUrl ? `<div class="profil-photo-note">Photo officielle à venir — ajoutée par l'Admin</div>` : ""}
   </div></div>`;
 
-  html += renderPushNotifCard();
 
   // Rôle dans le club + Poste, côte à côte
   html += `<div style="display:flex; gap:10px; align-items:stretch;">
@@ -3136,19 +3043,6 @@ function attachEvents() {
   document.querySelectorAll("[data-goto-profil-email]").forEach(el => {
     el.onclick = () => { vibrate(); currentPage = "profil"; render(); };
   });
-
-  const activerPushBtn = document.getElementById("activer-push-btn");
-  if (activerPushBtn) activerPushBtn.onclick = () => {
-    if (!window.OneSignalDeferred) { alert("Les notifications ne sont pas disponibles sur ce navigateur."); return; }
-    syncOneSignalLogin();
-    setTimeout(render, 1200); // laisse le temps à la popup d'autorisation d'être traitée
-  };
-
-  const resyncPushBtn = document.getElementById("resync-push-btn");
-  if (resyncPushBtn) resyncPushBtn.onclick = () => {
-    if (!window.OneSignalDeferred) return;
-    syncOneSignalLogin();
-  };
 
   const submitProfilEmail = document.getElementById("submit-profil-email");
   if (submitProfilEmail) submitProfilEmail.onclick = () => {
@@ -3786,18 +3680,6 @@ else {
     checkAccountStatus(loginSelectedNom);
   }
 }
-if (session) syncOneSignalLogin();
-</script>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function (OneSignal) {
-    if (!ONESIGNAL_APP_ID) return;
-    try {
-      await OneSignal.init({ appId: ONESIGNAL_APP_ID, safari_web_id: ONESIGNAL_SAFARI_WEB_ID, notifyButton: { enable: true } });
-      syncOneSignalLogin();
-    } catch (err) { /* navigateur non compatible — sans gravité */ }
-  });
 </script>
 </body>
 </html>
