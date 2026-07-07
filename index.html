@@ -632,6 +632,25 @@ function renderMatchCard(ev, isPast) {
   </div>`;
 }
 
+function renderCalendarExportCard() {
+  const allowedTeams = myAllowedEquipes();
+  if (!window.__calendarExportTeams) window.__calendarExportTeams = allowedTeams.slice();
+  const selected = window.__calendarExportTeams;
+
+  const checkboxes = allowedTeams.length > 1 ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+    ${allowedTeams.map(t => `<label style="display:flex; align-items:center; gap:5px; font-size:11px; color:#c3ccde; font-weight:700;">
+      <input type="checkbox" data-export-team-check="${t}" ${selected.includes(t) ? "checked" : ""} style="width:16px; height:16px;" /> ${t}
+    </label>`).join("")}
+  </div>` : "";
+
+  return `<div class="card">
+    <div class="section-h" style="margin-top:0;">Ton calendrier</div>
+    <div class="muted" style="font-size:10.5px; margin-bottom:10px; line-height:1.5;">Exporte tes matchs et entraînements pour les ajouter à l'agenda de ton téléphone.${allowedTeams.length > 1 ? " Choisis quelle(s) équipe(s) inclure :" : ""}</div>
+    ${checkboxes}
+    <button class="btn" id="export-calendar-btn">📅 Exporter mon calendrier (.ics)</button>
+  </div>`;
+}
+
 // ===================== EXPORT CALENDRIER (.ics) =====================
 function pad2(n) { return String(n).padStart(2, "0"); }
 function formatICSDate(d) {
@@ -642,7 +661,7 @@ function escapeICS(text) {
 }
 
 function exportCalendarICS() {
-  const myTeams = myAllowedEquipes();
+  const myTeams = (window.__calendarExportTeams && window.__calendarExportTeams.length) ? window.__calendarExportTeams : myAllowedEquipes();
   const relevant = evenements.filter(ev => myTeams.includes(eventEquipe(ev)) || eventEquipe(ev) === "Toutes");
   if (relevant.length === 0) { alert("Aucun événement à exporter pour le moment."); return; }
 
@@ -717,12 +736,15 @@ function goToPhotoView(equipe, date, titre) {
 }
 
 function renderGalleryPage() {
-  const equipe = window.__galleryEquipe || "SM1";
+  const allowedTeams = myAllowedEquipes();
+  const requested = window.__galleryEquipe || allowedTeams[0] || "SM1";
+  const equipe = allowedTeams.includes(requested) ? requested : (allowedTeams[0] || "SM1");
   const matches = evenements.filter(ev => typeClass(ev[3]) === "match" && (eventEquipe(ev) === equipe || eventEquipe(ev) === "Toutes"))
     .sort((a, b) => eventDateObj(b) - eventDateObj(a));
 
   let html = `<button class="back-link" data-goto-page="home">← Retour à l'accueil</button>`;
   html += `<div class="page-title">Galerie photos</div><div class="page-sub">Équipe ${escapeHtml(equipe)}</div>`;
+  html += renderTeamSwitcher(allowedTeams, equipe, "gallery-team");
 
   if (matches.length === 0) {
     html += `<div class="card"><div class="muted">Aucun match enregistré pour cette équipe pour le moment.</div></div>`;
@@ -794,7 +816,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-07-05"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-07-06"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -2169,11 +2191,7 @@ function renderAgenda() {
 
   html += renderTeamSwitcher(switcherTeams, activeTeam, "agenda-team");
 
-  html += `<div class="card">
-    <div class="section-h" style="margin-top:0;">Ton calendrier</div>
-    <div class="muted" style="font-size:10.5px; margin-bottom:10px; line-height:1.5;">Exporte tes matchs et entraînements pour les ajouter à l'agenda de ton téléphone.</div>
-    <button class="btn" id="export-calendar-btn">📅 Exporter mon calendrier (.ics)</button>
-  </div>`;
+  html += renderCalendarExportCard();
 
   if (hasRole("Admin") && activeTeam !== "Toutes") {
     html += `<button class="add-toggle" id="toggle-generate-trainings" style="border-style:solid; color:#7a8aad;">📅 ${window.__showGenerateTrainings ? "− Fermer" : "Générer les entraînements (mar/jeu)"}</button>`;
@@ -3213,6 +3231,18 @@ function attachEvents() {
   const exportCalendarBtn = document.getElementById("export-calendar-btn");
   if (exportCalendarBtn) exportCalendarBtn.onclick = () => { vibrate(); exportCalendarICS(); };
 
+  document.querySelectorAll("[data-export-team-check]").forEach(el => {
+    el.onchange = () => {
+      const t = el.dataset.exportTeamCheck;
+      if (!window.__calendarExportTeams) window.__calendarExportTeams = [];
+      if (el.checked) {
+        if (!window.__calendarExportTeams.includes(t)) window.__calendarExportTeams.push(t);
+      } else {
+        window.__calendarExportTeams = window.__calendarExportTeams.filter(x => x !== t);
+      }
+    };
+  });
+
   document.querySelectorAll("[data-goto-page]").forEach(el => {
     el.onclick = () => { vibrate(); currentPage = el.dataset.gotoPage; render(); };
   });
@@ -3223,6 +3253,10 @@ function attachEvents() {
       const [date, titre, equipe] = el.dataset.openMatchPhotos.split("|||");
       goToPhotoView(equipe, date, titre);
     };
+  });
+
+  document.querySelectorAll("[data-gallery-team]").forEach(el => {
+    el.onclick = () => { vibrate(); window.__galleryEquipe = el.dataset.galleryTeam; render(); };
   });
 
   const submitProfilEmail = document.getElementById("submit-profil-email");
