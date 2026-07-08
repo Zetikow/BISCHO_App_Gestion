@@ -157,6 +157,10 @@
     .login-card-outer { max-width: 360px; }
   }
   .login-card { background: #11141fee; backdrop-filter: blur(6px); border: 1px solid rgba(47,107,255,0.28); border-radius: 24px; padding: 36px 26px; text-align: center; position: relative; overflow: hidden; }
+  .login-suggestions { display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: #181d2e; border: 1px solid rgba(47,107,255,0.35); border-radius: 12px; max-height: 220px; overflow-y: auto; z-index: 50; text-align: left; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+  .login-suggestion-item { padding: 11px 14px; font-size: 13px; font-weight: 600; color: #e8e8ee; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .login-suggestion-item:last-child { border-bottom: none; }
+  .login-suggestion-item:active { background: rgba(47,107,255,0.18); }
   .login-card .login-glow { position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: var(--glow); }
   .login-card img { height: 168px; margin-bottom: 16px; border-radius: 30px; position: relative; box-shadow: 0 10px 40px rgba(47,107,255,0.35); }
   .login-card .login-title { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: -0.6px; margin-bottom: 6px; position: relative; }
@@ -1878,15 +1882,48 @@ function renderLogin() {
     <div class="login-title">LustuZone</div>
     <div class="login-subtitle">App de Gestion</div>
     <label class="field-label">Ton nom</label>
-    <input id="login-nom" list="login-noms-list" type="text" autocomplete="off"
-      placeholder="Tape ou choisis ton nom" value="${escapeHtml(loginSelectedNom)}" />
-    <datalist id="login-noms-list">
-      ${(loginNoms ? loginNoms.map(c => c.nom) : [...PLAYERS, "Coach", "Admin", "Bénévole"]).map(n => `<option value="${escapeHtml(n)}"></option>`).join("")}
-    </datalist>
+    <div style="position:relative;">
+      <input id="login-nom" type="text" autocomplete="off"
+        placeholder="Tape ou choisis ton nom" value="${escapeHtml(loginSelectedNom)}" />
+      <div id="login-suggestions" class="login-suggestions"></div>
+    </div>
     ${formHtml}
     ${loginPrefilledFromMemory && loginSelectedNom ? `<div class="muted" id="login-change-account" style="margin-top:12px; cursor:pointer; text-decoration:underline;">Ce n'est pas moi — changer de compte</div>` : ""}
     ${loginError ? `<div class="login-error">${loginError}</div>` : ""}
   </div></div></div>`;
+}
+
+function currentLoginNomsList() {
+  return loginNoms ? loginNoms.map(c => c.nom) : [...PLAYERS, "Coach", "Admin", "Bénévole"];
+}
+
+// Liste de suggestions maison (au lieu du <datalist> natif) : le support de datalist sur
+// Safari/iOS est connu pour être incohérent selon les versions (suggestions absentes ou
+// bugguées) — cette version fonctionne pareil sur tous les navigateurs, et surtout ne
+// reconstruit jamais le champ pendant la frappe (voir la note plus bas sur le "lettre par lettre").
+function renderLoginSuggestions(query) {
+  const box = document.getElementById("login-suggestions");
+  if (!box) return;
+  const q = (query || "").trim().toLowerCase();
+  if (!q) { box.innerHTML = ""; box.style.display = "none"; return; }
+  const matches = currentLoginNomsList().filter(n => n.toLowerCase().includes(q) && n.toLowerCase() !== q).slice(0, 6);
+  if (matches.length === 0) { box.innerHTML = ""; box.style.display = "none"; return; }
+  box.innerHTML = matches.map(n => `<div class="login-suggestion-item" data-suggest-nom="${escapeHtml(n)}">${escapeHtml(n)}</div>`).join("");
+  box.style.display = "block";
+  box.querySelectorAll("[data-suggest-nom]").forEach(el => {
+    el.onmousedown = (ev) => ev.preventDefault(); // évite que le champ perde le focus avant le clic
+    el.onclick = () => {
+      const nom = el.dataset.suggestNom;
+      const input = document.getElementById("login-nom");
+      if (input) input.value = nom;
+      loginSelectedNom = nom;
+      loginPrefilledFromMemory = false;
+      loginError = "";
+      box.innerHTML = ""; box.style.display = "none";
+      loginNeedsSetup = null;
+      checkAccountStatus(nom);
+    };
+  });
 }
 
 function attachLoginEvents() {
@@ -1896,15 +1933,21 @@ function attachLoginEvents() {
     loginSelectedNom = val;
     loginPrefilledFromMemory = false;
     loginError = "";
-    const allNoms = loginNoms ? loginNoms.map(c => c.nom) : [...PLAYERS, "Coach", "Admin", "Bénévole"];
+    const allNoms = currentLoginNomsList();
     // Important : ne JAMAIS appeler render() pendant la frappe — ça détruirait et recréerait
     // le champ à chaque lettre, ce qui casse le clavier virtuel sur mobile (effet "lettre par
-    // lettre"). On ne redessine que si le nom tapé correspond exactement à un compte connu.
+    // lettre"). On ne redessine que si le nom tapé correspond exactement à un compte connu ;
+    // la liste de suggestions, elle, se met à jour par manipulation directe du DOM (pas de render()).
+    renderLoginSuggestions(val);
     if (allNoms.includes(val)) {
       loginNeedsSetup = null;
+      document.getElementById("login-suggestions").style.display = "none";
       checkAccountStatus(val);
     }
   };
+  nomInput && nomInput.addEventListener("blur", () => {
+    setTimeout(() => { const box = document.getElementById("login-suggestions"); if (box) box.style.display = "none"; }, 150);
+  });
 
   const changeAccount = document.getElementById("login-change-account");
   if (changeAccount) changeAccount.onclick = () => {
@@ -4061,15 +4104,21 @@ document.addEventListener("click", (e) => {
   }
 });
 
-async function fetchLoginNoms() {
+async function fetchLoginNoms(retriesLeft = 2) {
   try {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=listNoms`);
     const data = await res.json();
     if (data.ok) {
       loginNoms = data.noms;
       if (!session) render();
+    } else if (retriesLeft > 0) {
+      setTimeout(() => fetchLoginNoms(retriesLeft - 1), 1500);
     }
-  } catch (err) { /* reste sur la liste figée en cas d'échec */ }
+  } catch (err) {
+    // Le premier appel à Apps Script peut être lent à démarrer ("cold start") — on retente
+    // avant d'abandonner sur la liste figée, pour ne pas rester bloqué sur une liste au hasard.
+    if (retriesLeft > 0) setTimeout(() => fetchLoginNoms(retriesLeft - 1), 1500);
+  }
 }
 
 grid = initGrid();
