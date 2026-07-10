@@ -171,6 +171,8 @@
   .login-card select, .login-card input { font-size: 17px; padding: 13px; }
   .field-label { display: block; text-align: left; margin: 12px 0 5px; font-size: 11px; color: #5a6b8c; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
   .paiement-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #1a2030; font-size: 12px; color: #c3ccde; }
+  .paypal-pay-btn { background: #ffc439; color: #003087; font-weight: 900; font-size: 10px; padding: 6px 11px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .paypal-pay-btn:active { opacity: 0.8; }
 
   .section-h { font-size: 11px; font-weight: 800; color: #fff; margin: 6px 2px 10px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 7px; }
   .section-h::before { content: ""; width: 14px; height: 3px; background: var(--accent); border-radius: 2px; }
@@ -474,6 +476,10 @@ const ACTIONS = [
 ];
 
 const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S.","Romain J.","Volodia M.","Victor P.","Mattéo MP.","Gabriel W.","Basil L.","Brahim I.","Maximilien M.","Arthur M.","Damien P.","Alexis W.","Mathieu S.","Nicolas Z.","Robin S."];
+
+// Ton identifiant PayPal.me (ex: "HBCBischoffsheim" pour paypal.me/HBCBischoffsheim).
+// Laisse vide "" tant que ce n'est pas créé : le bouton Payer reste alors simplement masqué.
+const PAYPAL_ME_USERNAME = "";
 const TEAMS = ["SM1", "U17", "SM2"];
 
 // Adresse mail de relance visible sur Profil/Accueil pour permettre aux joueurs de la renseigner.
@@ -795,7 +801,9 @@ function guideSections() {
       "Réservé au Coach et à l'Admin : historique complet et moyennes de présence par joueur.",
     ]},
     ...(isSM1 ? [{ title: "Paiements", items: [
-      "Réservé à l'Admin : suivi des cotisations réglées et restant dues.",
+      "Chaque joueur SM1 voit sa propre cotisation restante (sans voir celle des autres) et peut payer via PayPal.",
+      "Après paiement, le bouton \"J'ai payé\" prévient l'Admin par mail pour qu'il valide et enregistre.",
+      "L'Admin, lui, voit le suivi complet de toute l'équipe et enregistre les paiements reçus.",
     ]}] : []),
     { title: "Profil", items: [
       "Ta photo, tes rôles, ton ou tes postes.",
@@ -944,6 +952,22 @@ async function fetchSupportHistory() {
   render();
 }
 
+async function notifyPaymentClaimApi(montant) {
+  window.__paymentNotifySending = true;
+  render();
+  try {
+    const params = new URLSearchParams({ action: "notifyPaymentClaim", montant, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    window.__paymentNotifySending = false;
+    window.__paymentNotifySent = true;
+    render();
+  } catch (err) {
+    window.__paymentNotifySending = false;
+    isOnline = false;
+    render();
+  }
+}
+
 async function sendSupportMessageApi(message) {
   window.__supportSending = true;
   render();
@@ -1067,7 +1091,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-07-16"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-07-18"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -2066,7 +2090,7 @@ function getTabsForRole() {
 
   const extraCandidates = [];
   if (hasRole("Coach") || hasRole("Admin")) extraCandidates.push({ id: "presence", label: "Présence", main: false });
-  if (hasRole("Admin")) extraCandidates.push({ id: "paiements", label: "Paiements", main: false });
+  if (hasRole("Admin") || ((hasRole("Joueur") || hasRole("Coach")) && isInTeam("SM1"))) extraCandidates.push({ id: "paiements", label: "Paiements", main: false });
   if (hasRole("Salarié") || hasRole("Admin")) extraCandidates.push({ id: "salaries", label: "Espace salariés", main: false });
   const hasCovoit = hasRole("Joueur") || hasRole("Coach") || hasRole("Parent") || hasRole("Admin");
 
@@ -3477,6 +3501,28 @@ function renderSalariesPage() {
 }
 
 function renderPaiementsPage() {
+  // Vue joueur/coach SM1 (pas Admin) : juste son propre solde, pas celui des autres.
+  if (!hasRole("Admin")) {
+    const reste = resteAPayer(session.nom);
+    let html = `<div class="page-title">Paiements</div><div class="page-sub">Ta cotisation.</div>`;
+    html += `<div class="pay-summary">
+      <div class="pay-summary-label">${reste > 0 ? "Reste à payer" : "Cotisation à jour"}</div>
+      <div class="pay-summary-val" style="color:${reste > 0 ? '#ff5a5a' : '#33d17a'};">${fmt(reste)} €</div>
+    </div>`;
+    if (reste > 0) {
+      if (PAYPAL_ME_USERNAME) {
+        html += `<a href="https://paypal.me/${encodeURIComponent(PAYPAL_ME_USERNAME)}/${reste}" target="_blank" rel="noopener" class="btn" style="display:block; text-align:center; background:#ffc439; color:#003087; text-decoration:none; box-sizing:border-box;">Payer ${fmt(reste)} € via PayPal</a>`;
+      }
+      html += `<button class="btn secondary" style="margin-top:10px;" id="notify-payment-btn" ${window.__paymentNotifySending ? "disabled" : ""}>${window.__paymentNotifySending ? "Envoi en cours..." : "✓ J'ai payé — prévenir l'Admin"}</button>`;
+      if (window.__paymentNotifySent) {
+        html += `<div class="muted" style="margin-top:8px; color:#33d17a; font-weight:700;">✓ L'Admin a été prévenu, merci !</div>`;
+      }
+    } else {
+      html += `<div class="card"><div class="muted">Aucun solde restant — merci !</div></div>`;
+    }
+    return html;
+  }
+
   const totalDu = grandTotal();
   const totalPayeAll = paiements.reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
   const resteAEncaisser = totalDu - totalPayeAll;
@@ -3511,7 +3557,10 @@ function renderPaiementsPage() {
   resteVisible.forEach(p => {
     const reste = resteAPayer(p);
     const color = reste > 0 ? "#ff5a5a" : "#33d17a";
-    html += `<div class="paiement-row"><div>${p}</div><div style="color:${color}; font-weight:800;">${fmt(reste)} €</div></div>`;
+    const payBtn = (reste > 0 && PAYPAL_ME_USERNAME)
+      ? `<a href="https://paypal.me/${encodeURIComponent(PAYPAL_ME_USERNAME)}/${reste}" target="_blank" rel="noopener" class="paypal-pay-btn">Payer</a>`
+      : "";
+    html += `<div class="paiement-row"><div>${p}</div><div style="display:flex; align-items:center; gap:8px;"><span style="color:${color}; font-weight:800;">${fmt(reste)} €</span>${payBtn}</div></div>`;
   });
   if (resteSorted.length > 6) {
     html += `<div class="expand-toggle" data-toggle-reste-payer="1">${resteExpanded ? "Réduire ▲" : `Voir les ${resteSorted.length - 6} autres ▾`}</div>`;
@@ -3682,6 +3731,12 @@ function attachEvents() {
 
   const exportCalendarBtn = document.getElementById("export-calendar-btn");
   if (exportCalendarBtn) exportCalendarBtn.onclick = () => { vibrate(); exportCalendarICS(); };
+
+  const notifyPaymentBtn = document.getElementById("notify-payment-btn");
+  if (notifyPaymentBtn) notifyPaymentBtn.onclick = () => {
+    vibrate();
+    notifyPaymentClaimApi(fmt(resteAPayer(session.nom)));
+  };
 
   const supportSubmit = document.getElementById("support-submit");
   if (supportSubmit) supportSubmit.onclick = () => {
