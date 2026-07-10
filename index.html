@@ -822,7 +822,7 @@ function guideSections() {
     { title: "Covoiturage", items: [
       "Visible pour les matchs à l'extérieur uniquement.",
       "Indique si tu conduis (avec le nombre de places) ou si tu cherches une place.",
-      "Pour les équipes de mineurs, c'est le parent qui renseigne à la place de l'enfant.",
+      "Pour les équipes de mineurs, le joueur ET son parent peuvent tous les deux le renseigner.",
     ]},
     { title: "Une question qui n'est pas ici ?", items: [
     "Utilise \"Support / une question ?\" dans le menu (en cliquant sur tes initiales) — ton message part directement à l'équipe de gestion du club.",
@@ -1093,7 +1093,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-07-21"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-07-22"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -1839,8 +1839,10 @@ function myCarpoolTeams() {
 // plusieurs identités (soi-même ET un ou plusieurs enfants dans la même équipe).
 function myCarpoolIdentitiesForTeam(equipe) {
   const identities = [];
+  // Un joueur (même mineur, équipe U) peut désormais renseigner son propre covoiturage, en plus
+  // de son parent qui garde aussi cette possibilité — les deux peuvent le faire, en autonomie.
   const selfEligible = hasRole("Admin")
-    || (hasRole("Joueur") && equipesForRole("Joueur").includes(equipe) && !equipe.startsWith("U"))
+    || (hasRole("Joueur") && equipesForRole("Joueur").includes(equipe))
     || (hasRole("Coach") && equipesForRole("Coach").includes(equipe));
   if (selfEligible) identities.push({ nom: session.nom, label: "Toi", isChild: false });
   (session.roles || []).filter(r => r.role === "Parent").forEach(r => {
