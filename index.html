@@ -39,8 +39,8 @@
     background-position: top center;
     background-repeat: repeat-y;
   }
-  .header { display: flex; align-items: center; gap: 14px; margin: -12px -12px 16px; padding: calc(env(safe-area-inset-top) + 16px) 18px 20px; background: var(--grad); border-radius: 20px 20px 22px 22px; position: relative; overflow: hidden; }
-  .header::after { content: ""; position: absolute; right: -34px; top: -34px; width: 130px; height: 130px; border: 3px solid rgba(255,255,255,0.15); border-radius: 50%; pointer-events: none; }
+  .header { display: flex; align-items: center; gap: 14px; margin: -12px -12px 16px; padding: calc(env(safe-area-inset-top) + 16px) 18px 20px; background: var(--grad); border-radius: 20px 20px 22px 22px; position: relative; }
+  .header::after { content: ""; position: absolute; right: -30px; top: 8px; width: 120px; height: 120px; border: 3px solid rgba(255,255,255,0.15); border-radius: 50%; pointer-events: none; z-index: 0; }
   .header img { height: 56px; width: 56px; border-radius: 15px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); position: relative; z-index: 2; }
   .header .title { font-family: var(--font-disp); font-size: 24px; font-weight: 700; color: #fff; letter-spacing: 0.2px; line-height: 1; position: relative; z-index: 2; }
   .header .subtitle { font-size: 11px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 1.3px; font-weight: 700; margin-top: 4px; position: relative; z-index: 2; }
@@ -676,7 +676,8 @@ function renderResultsWidget(equipe) {
   const collapseKey = "results_" + equipe;
   const isCollapsed = !!(window.__homeCollapsed && window.__homeCollapsed[collapseKey]);
 
-  return `<div class="matchcard-wrap">    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${isCollapsed ? "0" : "8px"};">
+  return `<div class="matchcard-wrap" style="${isCollapsed ? "background:#11141f; border:1px solid rgba(66,117,212,0.4); border-radius:16px; padding:14px;" : ""}">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${isCollapsed ? "0" : "8px"};">
       <div class="section-h" style="margin-bottom:0; cursor:pointer;" data-toggle-home-section="${collapseKey}">🤾 Résultats & prochains matchs — ${equipe} ${isCollapsed ? "▾" : "▴"}</div>
       ${!isCollapsed ? `<button class="btn secondary" style="width:auto; padding:6px 12px; font-size:9.5px; margin:0;" data-goto-gallery="${escapeHtml(equipe)}">📷 Photos</button>` : ""}
     </div>
@@ -1430,7 +1431,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-08-14"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-08-15"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
