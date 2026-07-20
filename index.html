@@ -40,7 +40,6 @@
     background-repeat: repeat-y;
   }
   .header { display: flex; align-items: center; gap: 14px; margin: -12px -12px 16px; padding: calc(env(safe-area-inset-top) + 16px) 18px 20px; background: var(--grad); border-radius: 20px 20px 22px 22px; position: relative; }
-  .header::after { content: ""; position: absolute; right: -30px; top: 8px; width: 120px; height: 120px; border: 3px solid rgba(255,255,255,0.15); border-radius: 50%; pointer-events: none; z-index: 0; }
   .header img { height: 56px; width: 56px; border-radius: 15px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); position: relative; z-index: 2; }
   .header .title { font-family: var(--font-disp); font-size: 24px; font-weight: 700; color: #fff; letter-spacing: 0.2px; line-height: 1; position: relative; z-index: 2; }
   .header .subtitle { font-size: 11px; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 1.3px; font-weight: 700; margin-top: 4px; position: relative; z-index: 2; }
@@ -987,9 +986,9 @@ function renderOsteoManagerView() {
         <option value="Toutes">Toutes</option>
       </select>
       <label class="field-label">Date</label>
-      <input id="osteo-slot-date" type="date" />
+      ${dateSelectHtml("osteo-slot-date", "")}
       <label class="field-label">Heure</label>
-      <input id="osteo-slot-heure" type="time" />
+      ${heureSelectHtml("osteo-slot-heure", "")}
       <label class="field-label">Lieu</label>
       <input id="osteo-slot-lieu" type="text" placeholder="Ex: Lustucru Arena" value="Lustucru Arena" />
       <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#e4e8f2; font-weight:700; margin-top:10px;">
@@ -1431,7 +1430,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-08-15"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-08-17"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -4255,8 +4254,8 @@ function attachEvents() {
 
   const osteoSlotSubmit = document.getElementById("osteo-slot-submit");
   if (osteoSlotSubmit) osteoSlotSubmit.onclick = () => {
-    const date = document.getElementById("osteo-slot-date").value;
-    const heure = document.getElementById("osteo-slot-heure").value;
+    const date = readDateSelect("osteo-slot-date");
+    const heure = readHeureSelect("osteo-slot-heure");
     const lieu = document.getElementById("osteo-slot-lieu").value;
     const equipe = document.getElementById("osteo-slot-equipe").value;
     if (!date || !heure) { alert("Merci de renseigner au moins la date et l'heure."); return; }
