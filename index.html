@@ -320,6 +320,9 @@
   .ldsdr:after { content: " "; display: block; width: 48px; height: 48px; margin: 6px; border-radius: 50%; border: 5px solid #1E457B; border-color: #1E457B transparent; animation: ldsdr 1.2s linear infinite; }
   @keyframes ldsdr { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   .matchcard-wrap { position: relative; overflow: hidden; }
+  .matchcard-carousel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 2px; margin: 0 -2px; scrollbar-width: none; }
+  .matchcard-carousel::-webkit-scrollbar { display: none; }
+  .matchcard-carousel .matchcard { flex: 0 0 88%; scroll-snap-align: start; margin-bottom: 0; }
   .matchcard { border-radius: 14px; padding: 11px 13px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08); background: #11141f; position: relative; overflow: hidden; }
   .matchcard:last-child { margin-bottom: 0; }
   .matchcard.result.win { background: linear-gradient(160deg, rgba(51,209,122,0.20), rgba(17,20,31,0.4)); border-color: rgba(51,209,122,0.45); animation: victoryGlow 2.4s ease-in-out infinite; }
@@ -601,13 +604,26 @@ function renderResultsWidget(equipe) {
   const upcoming = matches.filter(ev => !isResult(ev)).sort((a, b) => eventDateObj(a) - eventDateObj(b)).slice(0, 2);
   if (past.length === 0 && upcoming.length === 0) return "";
 
-  const rows = [...past.map(ev => renderMatchCard(ev, true)), ...upcoming.map(ev => renderMatchCard(ev, false))];
+  // Le plus récent résultat et le prochain match d'abord (visibles sans avoir à glisser),
+  // les éventuels autres juste après dans le même carrousel.
+  const ordered = [];
+  if (past.length) ordered.push(past[past.length - 1]);
+  if (upcoming.length) ordered.push(upcoming[0]);
+  past.slice(0, -1).reverse().forEach(ev => ordered.push(ev));
+  upcoming.slice(1).forEach(ev => ordered.push(ev));
+
+  const isPastSet = new Set(past.map(ev => ev[0]));
+  const cards = ordered.map(ev => renderMatchCard(ev, isPastSet.has(ev[0])));
+
+  const collapseKey = "results_" + equipe;
+  const isCollapsed = !!(window.__homeCollapsed && window.__homeCollapsed[collapseKey]);
+
   return `<div class="card matchcard-wrap">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-      <div class="section-h" style="margin-bottom:0;">🤾 Résultats & prochains matchs — ${equipe}</div>
-      <button class="btn secondary" style="width:auto; padding:6px 12px; font-size:9.5px; margin:0;" data-goto-gallery="${escapeHtml(equipe)}">📷 Photos</button>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${isCollapsed ? "0" : "8px"};">
+      <div class="section-h" style="margin-bottom:0; cursor:pointer;" data-toggle-home-section="${collapseKey}">🤾 Résultats & prochains matchs — ${equipe} ${isCollapsed ? "▾" : "▴"}</div>
+      ${!isCollapsed ? `<button class="btn secondary" style="width:auto; padding:6px 12px; font-size:9.5px; margin:0;" data-goto-gallery="${escapeHtml(equipe)}">📷 Photos</button>` : ""}
     </div>
-    ${rows.join("")}
+    ${isCollapsed ? "" : `<div class="matchcard-carousel">${cards.join("")}</div>`}
   </div>`;
 }
 
@@ -1106,7 +1122,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-08-01"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-08-02"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -1146,7 +1162,14 @@ function primaryEquipe() {
   if (joueur) return joueur.equipe;
   const coach = session.roles.find(r => r.role === "Coach");
   if (coach) return coach.equipe;
-  return session.roles[0].equipe || "SM1";
+  const parent = session.roles.find(r => r.role === "Parent");
+  if (parent) {
+    const childRow = findCompteRow(parent.equipe);
+    const childTeams = childRow ? rowEquipesForRole(childRow, "Joueur") : [];
+    if (childTeams.length) return childTeams[0];
+  }
+  const firstEquipe = session.roles[0].equipe;
+  return TEAMS.includes(firstEquipe) ? firstEquipe : "SM1";
 }
 function rolesLabel() {
   if (!session || !Array.isArray(session.roles)) return "";
@@ -1827,8 +1850,15 @@ function sortedVisibleEvenements() {
 // SM1 qui est aussi coach U17 voit les deux), et toutes pour l'Admin.
 function myAllowedEquipes() {
   if (hasRole("Admin")) return TEAMS.slice();
-  const set = new Set((session.roles || []).map(r => r.equipe));
-  set.add(primaryEquipe());
+  const set = new Set();
+  (session.roles || []).forEach(r => {
+    if (TEAMS.includes(r.equipe)) set.add(r.equipe);
+    if (r.role === "Parent") {
+      const childRow = findCompteRow(r.equipe);
+      if (childRow) rowEquipesForRole(childRow, "Joueur").forEach(t => set.add(t));
+    }
+  });
+  if (set.size === 0) set.add(primaryEquipe());
   return TEAMS.filter(t => set.has(t));
 }
 
@@ -3335,11 +3365,44 @@ function renderProfilPage() {
     </div>`;
   } else {
     const isJoueur = hasRole("Joueur");
-    const joueurEquipe = equipesForRole("Joueur")[0] || primaryEquipe();
-    html += renderPtypeCard("Présence par type", computePresenceByType(session.nom, joueurEquipe));
+    let presenceNom = session.nom, presenceEquipe = equipesForRole("Joueur")[0] || primaryEquipe();
+    let presenceLabel = "Présence par type";
+    const parentRole = !isJoueur ? (session.roles || []).find(r => r.role === "Parent") : null;
+    if (parentRole) {
+      presenceNom = parentRole.equipe; // le rôle Parent stocke le nom de l'enfant dans "equipe"
+      const childRow = findCompteRow(presenceNom);
+      presenceEquipe = childRow ? (rowEquipesForRole(childRow, "Joueur")[0] || presenceEquipe) : presenceEquipe;
+      presenceLabel = `Présence de ${presenceNom}`;
+    }
+    html += renderPtypeCard(presenceLabel, computePresenceByType(presenceNom, presenceEquipe));
     if (isJoueur) html += renderStatsRecapCard(postes);
+    if (parentRole) html += renderCovoiturageHistoryCard(presenceNom);
   }
 
+  return html;
+}
+
+// Historique du covoiturage (matchs passés) pour une personne donnée — utilisé notamment sur
+// le Profil des parents, pour voir ce qui a été renseigné pour leur enfant au fil de la saison.
+function renderCovoiturageHistoryCard(nom) {
+  const now = new Date();
+  const entries = covoiturage.filter(r => r[1] === nom).map(r => {
+    const ev = evenements.find(e => e[0] === r[0]);
+    return ev ? { ev, jeConduit: r[2], besoinPlace: r[4] } : null;
+  }).filter(Boolean).filter(x => eventDateObj(x.ev) < now).sort((a, b) => eventDateObj(b.ev) - eventDateObj(a.ev));
+
+  let html = `<div class="card"><div class="section-h" style="margin-top:0;">Historique covoiturage</div>`;
+  if (entries.length === 0) {
+    html += `<div class="muted">Aucun historique pour le moment.</div>`;
+  } else {
+    entries.slice(0, 8).forEach(({ ev, jeConduit, besoinPlace }) => {
+      const d = eventDateObj(ev);
+      const dateLabel = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }).replace(".", "").toUpperCase();
+      const statut = jeConduit === "Oui" ? "🚗 A conduit" : (besoinPlace === "Oui" ? "🙋 A eu besoin d'une place" : "—");
+      html += `<div class="paiement-row"><div>${dateLabel} — ${escapeHtml(ev[4] || "Match")}</div><div class="muted" style="font-size:11px;">${statut}</div></div>`;
+    });
+  }
+  html += `</div>`;
   return html;
 }
 
@@ -3773,6 +3836,16 @@ function attachEvents() {
 
   document.querySelectorAll("[data-goto-profil-email]").forEach(el => {
     el.onclick = () => { vibrate(); currentPage = "profil"; render(); };
+  });
+
+  document.querySelectorAll("[data-toggle-home-section]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      const key = el.dataset.toggleHomeSection;
+      if (!window.__homeCollapsed) window.__homeCollapsed = {};
+      window.__homeCollapsed[key] = !window.__homeCollapsed[key];
+      render();
+    };
   });
 
   document.querySelectorAll("[data-goto-gallery]").forEach(el => {
