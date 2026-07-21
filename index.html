@@ -863,13 +863,34 @@ function goToPhotoView(equipe, date, titre) {
 
 // ===================== RDV OSTÉO =====================
 function renderOsteoHomeCard() {
-  return `<div class="card">
-    <div class="section-h" style="margin-top:0;">🩺 RDV Ostéo</div>
-    <div style="display:flex; gap:8px;">
+  const myTeams = myAllowedEquipes();
+  const now = new Date();
+  const reservedSlotIds = new Set(osteoReservations.map(r => r[0]));
+  const nextSlot = osteoSlots.filter(s => osteoSlotDate(s) >= now && !reservedSlotIds.has(s[0]) && (s[4] === "Toutes" || myTeams.includes(s[4])))
+    .sort((a, b) => osteoSlotDate(a) - osteoSlotDate(b))[0];
+
+  let html = `<div class="card">
+    <div class="section-h" style="margin-top:0;">🩺 Rendez-vous Ostéo</div>`;
+
+  if (nextSlot) {
+    const d = osteoSlotDate(nextSlot);
+    const dateLabel = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+    html += `<div class="osteo-slot-card" style="width:100%; flex:none;">
+      <div class="osteo-tag">${escapeHtml(nextSlot[4])}</div>
+      <div class="osteo-slot-date2">${dateLabel}</div>
+      <div class="osteo-slot-meta2">${escapeHtml(nextSlot[2])}${nextSlot[3] ? "<br/>" + escapeHtml(nextSlot[3]) : ""}</div>
+      <div class="osteo-mini-btn" data-osteo-reserve-home="${escapeHtml(nextSlot[0])}">Réserver</div>
+    </div>`;
+  } else {
+    html += `<div class="muted" style="margin-bottom:12px;">Aucun créneau disponible pour le moment.</div>`;
+  }
+
+  html += `<div style="display:flex; gap:8px; margin-top:10px;">
       <button class="btn" style="margin:0;" data-goto-osteo-tab="dispo">RDV Dispo</button>
       <button class="btn secondary" style="margin:0;" data-goto-osteo-tab="mes">Mes RDV</button>
     </div>
   </div>`;
+  return html;
 }
 
 function renderOsteoPage() {
@@ -1432,7 +1453,7 @@ const LOGO_DATA_URI = "icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-08-25"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-08-26"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -2745,7 +2766,7 @@ function renderHome() {
 
   // Fil d'actualité
   html += `<div class="section-h">Fil d'actualité</div>`;
-  const homeActus = visibleActualites().slice(0, 2);
+  const homeActus = visibleActualites().filter(a => String(a[1] || "").indexOf("Nouveau(x) créneau(x) RDV Ostéo") !== 0).slice(0, 2);
   if (homeActus.length === 0) {
     html += `<div class="card muted">Aucune actualité pour le moment.</div>`;
   } else {
@@ -4235,6 +4256,16 @@ function attachEvents() {
       vibrate();
       currentPage = "osteo";
       window.__osteoTab = el.dataset.gotoOsteoTab;
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-osteo-reserve-home]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      currentPage = "osteo";
+      window.__osteoTab = "dispo";
+      window.__osteoReserveSlotId = el.dataset.osteoReserveHome;
       render();
     };
   });
