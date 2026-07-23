@@ -208,7 +208,10 @@ function renderOsteoReassignForm(slotId) {
     </select>
     <label class="field-label">Message (envoyé par mail à la personne)</label>
     <textarea id="osteo-reassign-message" rows="3" placeholder="Ex: J'ai besoin de te voir en priorité avant le match, merci de venir à ce créneau."></textarea>
-    <button class="btn" style="margin-top:6px;" data-osteo-reassign-confirm="${escapeHtml(slotId)}">Confirmer la réassignation</button>
+    <div class="row-flex" style="margin-top:6px;">
+      <button class="btn secondary" style="flex:1;" data-osteo-reassign-cancel="1">Retour</button>
+      <button class="btn" style="flex:1;" data-osteo-reassign-confirm="${escapeHtml(slotId)}">Confirmer la réassignation</button>
+    </div>
   </div>`;
 }
 
@@ -330,6 +333,10 @@ function attachOsteoEvents() {
 
   document.querySelectorAll("[data-osteo-reassign]").forEach(el => {
     el.onclick = () => { vibrate(); window.__osteoReassignId = el.dataset.osteoReassign; render(); };
+  });
+
+  document.querySelectorAll("[data-osteo-reassign-cancel]").forEach(el => {
+    el.onclick = () => { vibrate(); window.__osteoReassignId = null; render(); };
   });
 
   document.querySelectorAll("[data-osteo-reassign-confirm]").forEach(el => {

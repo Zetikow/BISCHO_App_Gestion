@@ -3,6 +3,12 @@
 // (feuille "OsteoReservations"). Module optionnel : à supprimer avec
 // son fichier frontend js/modules/osteo.js pour un club qui n'a pas ce
 // service.
+//
+// Notifications mail : chaque réservation/annulation prévient Eve ET la
+// personne concernée (voir sendOsteoBookingNotifications) ; la réassignation
+// prioritaire prévient seulement la personne réassignée (voir
+// api_reassignOsteoSlotPriority). Toutes reposent sur la colonne Email de
+// "Comptes" — sans adresse renseignée, l'envoi est silencieusement ignoré.
 // ===================================================================
 
 // Créneaux de RDV ostéo proposés par Eve (ou l'Admin). RecurrentId regroupe les créneaux créés
@@ -206,11 +212,12 @@ function api_reserveOsteoSlot(ss, e) {
     if (data[i][0] === slotId) return jsonOut({ ok: false, error: "already_taken" });
   }
   resaSheet.appendRow([slotId, nom, motif]);
+  sendOsteoBookingNotifications(ss, slotId, nom, motif, "reserve");
   return jsonOut({ ok: true });
 }
 
-// Annule sa propre réservation — le créneau redevient automatiquement disponible pour les
-// autres, sans aucune action supplémentaire côté Ostéo/Admin.
+// Annule sa propre réservation (ou celle de quelqu'un d'autre si Admin/Ostéo) — le créneau
+// redevient automatiquement disponible pour les autres, sans aucune action supplémentaire.
 function api_cancelOsteoReservation(ss, e) {
   const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
   if (!role) return jsonOut({ ok: false, error: "auth" });
@@ -225,10 +232,57 @@ function api_cancelOsteoReservation(ss, e) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === slotId && data[i][1] === nom) {
       resaSheet.deleteRow(i + 1);
+      sendOsteoBookingNotifications(ss, slotId, nom, "", "cancel");
       return jsonOut({ ok: true });
     }
   }
   return jsonOut({ ok: false, error: "not_found" });
+}
+
+// Prévient par mail Eve ET la personne concernée à chaque réservation/annulation de créneau
+// ostéo — que l'action vienne de la personne elle-même ou d'Eve/Admin agissant pour elle
+// (auquel cas "nom" est la personne concernée, pas l'auteur de l'action). Jamais bloquant :
+// une erreur d'envoi ne doit jamais faire échouer la réservation/annulation elle-même.
+function sendOsteoBookingNotifications(ss, slotId, nom, motif, action) {
+  try {
+    const slotsSheet = ss.getSheetByName("OsteoSlots");
+    const slot = slotsSheet.getDataRange().getValues().find(r => r[0] === slotId);
+    if (!slot) return;
+    const comptesSheet = ss.getSheetByName("Comptes");
+    ensureComptesSchema(comptesSheet);
+    const comptesData = comptesSheet.getDataRange().getValues();
+    const emailFor = (n) => {
+      for (let i = 1; i < comptesData.length; i++) {
+        if (comptesData[i][COL_NOM] === n) return comptesData[i][COL_EMAIL] || "";
+      }
+      return "";
+    };
+
+    const dateStr = slot[1] instanceof Date ? Utilities.formatDate(slot[1], Session.getScriptTimeZone(), "dd/MM/yyyy") : slot[1];
+    const heure = slot[2] instanceof Date ? Utilities.formatDate(slot[2], Session.getScriptTimeZone(), "HH:mm") : slot[2];
+    const lieu = slot[3] || "";
+    const quand = dateStr + " à " + heure + (lieu ? ", à " + lieu : "");
+
+    const playerEmail = emailFor(nom);
+    if (playerEmail) {
+      const subject = action === "reserve" ? "Ton RDV ostéo est confirmé" : "Ton RDV ostéo a bien été annulé";
+      const body = action === "reserve"
+        ? "Bonjour " + nom + ",\n\nTa réservation de RDV ostéo le " + quand + " est bien enregistrée.\n\n" + (motif ? "Motif indiqué : " + motif + "\n\n" : "") + "Tu peux l'annuler à tout moment depuis l'appli, page RDV Ostéo → Mes RDV.\n\nÀ bientôt !"
+        : "Bonjour " + nom + ",\n\nTon RDV ostéo du " + quand + " a bien été annulé. Le créneau est de nouveau disponible pour les autres.\n\nÀ bientôt !";
+      try { MailApp.sendEmail(playerEmail, subject, body, { name: "LustuZone — RDV Ostéo" }); } catch (err) { Logger.log("Erreur envoi mail ostéo à " + nom + " : " + err); }
+    }
+
+    const eveEmail = emailFor("Eve");
+    if (eveEmail) {
+      const subject = action === "reserve" ? "Nouvelle réservation RDV ostéo" : "Annulation RDV ostéo";
+      const body = action === "reserve"
+        ? nom + " vient de réserver un RDV ostéo le " + quand + "." + (motif ? "\n\nMotif indiqué : " + motif : "")
+        : "Le RDV ostéo du " + quand + " avec " + nom + " vient d'être annulé.";
+      try { MailApp.sendEmail(eveEmail, subject, body, { name: "LustuZone — RDV Ostéo" }); } catch (err) { Logger.log("Erreur envoi mail ostéo à Eve : " + err); }
+    }
+  } catch (err) {
+    Logger.log("Erreur sendOsteoBookingNotifications : " + err); // jamais bloquant pour la réservation/annulation
+  }
 }
 
 // Réservé à Ostéo/Admin : annule la réservation en cours sur un créneau et la réattribue

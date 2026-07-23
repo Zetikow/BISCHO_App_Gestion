@@ -247,6 +247,24 @@ body.login-mode .login-wrap { flex: 1; min-height: 0; }
 .modal-title { font-size: 14px; font-weight: 800; color: #fff; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-preview { flex: 1; background: #000; border-radius: 14px; overflow: hidden; }
 .modal-preview iframe { width: 100%; height: 100%; border: none; }
+
+.presence-row[data-open-presence-detail] { cursor: pointer; }
+.presence-detail-overlay { position: fixed; inset: 0; background: #05060ac2; display: flex; align-items: flex-end; justify-content: center; z-index: 95; padding: 0; }
+.presence-detail-sheet { width: 100%; max-height: 65vh; background: #11141f; border: 1px solid #1c2333; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,0.45); transition: max-height 0.18s ease-out, border-radius 0.18s ease-out; }
+.presence-detail-sheet.expanded { max-height: 94vh; height: 94vh; border-radius: 18px 18px 0 0; }
+@media (min-width: 700px) {
+  .presence-detail-overlay { align-items: center; padding: 16px; }
+  .presence-detail-sheet { max-width: 480px; border-radius: 18px; max-height: 75vh; }
+  .presence-detail-sheet.expanded { max-width: 700px; height: 90vh; max-height: 90vh; border-radius: 18px; }
+}
+.presence-detail-header { display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px; border-bottom: 1px solid #1a2030; flex-shrink: 0; }
+.presence-detail-title { font-size: 14px; font-weight: 800; color: #fff; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presence-detail-expand { width: 32px; height: 32px; border-radius: 9px; background: #1a1f30; display: flex; align-items: center; justify-content: center; color: #e4e8f2; font-size: 15px; flex-shrink: 0; cursor: pointer; }
+.presence-detail-body { flex: 1; overflow-y: auto; padding: 14px; }
+.presence-detail-ev { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1a2030; font-size: 12.5px; }
+.presence-detail-ev:last-child { border-bottom: none; }
+.presence-detail-ev-date { color: var(--accent); font-weight: 800; text-transform: capitalize; flex-shrink: 0; width: 70px; }
+.presence-detail-ev-title { color: #e4e8f2; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ev-date { text-align: center; flex-shrink: 0; width: 46px; }
 .ev-day { font-size: 22px; font-weight: 900; color: #fff; line-height: 1; }
 .ev-month { font-size: 10px; color: var(--accent); text-transform: uppercase; font-weight: 700; margin-top: 3px; }

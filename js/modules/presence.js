@@ -1,6 +1,11 @@
 // ===================================================================
 // PRÉSENCE — pointage par événement (feuille "PresenceEvenements"),
 // justifications d'absence, et moyennes de présence par équipe.
+//
+// Détail par joueur : cliquer une ligne de moyenne (mois ou saison, voir
+// renderAverageCard) ouvre une petite fenêtre (pas une page dédiée) listant
+// les événements où il a été absent puis présent sur la même période — voir
+// renderPresenceDetailModal / computePresenceDetail.
 // ===================================================================
 
 function computeAverages(equipe, monthOnly) {
@@ -44,7 +49,9 @@ function renderAverageCard(equipe, monthOnly) {
     visible.forEach(s => {
       const label = s.pct === null ? "Pas de donnée" : `${fmt(s.pct)} %`;
       const color = s.pct === null ? "#e4e8f2" : (s.pct >= 75 ? "#33d17a" : (s.pct >= 50 ? "#ffb43c" : "#ff5a5a"));
-      html += `<div class="presence-row"><div>${s.p}</div><div style="color:${color}; font-weight:700; font-size:12px;">${label}</div></div>`;
+      html += `<div class="presence-row" data-open-presence-detail="1" data-presence-detail-player="${escapeHtml(s.p)}" data-presence-detail-equipe="${escapeHtml(equipe)}" data-presence-detail-month="${monthOnly ? "1" : "0"}">
+        <div>${s.p}</div><div style="color:${color}; font-weight:700; font-size:12px;">${label}</div>
+      </div>`;
     });
     if (stats.length > 5) {
       html += `<div class="expand-toggle" ${toggleAttr}="1">${expanded ? "Réduire ▲" : `Voir les ${stats.length - 5} autres ▾`}</div>`;
@@ -52,6 +59,67 @@ function renderAverageCard(equipe, monthOnly) {
   }
   html += `</div>`;
   return html;
+}
+
+// Détail présence/absence d'un joueur pour une équipe donnée, sur la même période (mois en
+// cours ou saison) que la ligne de moyenne cliquée — voir renderAverageCard et
+// window.__presenceDetailFor (rempli par attachPresenceEvents).
+function computePresenceDetail(p, equipe, monthOnly) {
+  let evs = evenements.filter(ev => eventEquipe(ev) === equipe);
+  if (monthOnly) {
+    const now = new Date();
+    evs = evs.filter(ev => {
+      const d = eventDateObj(ev);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+  }
+  const absences = [], presences = [];
+  evs.forEach(ev => {
+    const v = presenceEvenements[`${ev[0]}_${p}`];
+    if (v === "Oui") presences.push(ev);
+    else if (v === "Non") absences.push(ev);
+  });
+  const byDateDesc = (a, b) => eventDateObj(b) - eventDateObj(a);
+  return { absences: absences.sort(byDateDesc), presences: presences.sort(byDateDesc) };
+}
+
+function renderPresenceDetailEvRow(ev) {
+  const d = eventDateObj(ev);
+  const dateLabel = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  const titre = typeClass(ev[3]) === "match" ? formatMatchDisplay(ev[4], ev[5]).label : (ev[4] || ev[3] || "Événement");
+  return `<div class="presence-detail-ev">
+    <span class="presence-detail-ev-date">${dateLabel}</span>
+    <span class="presence-detail-ev-title">${escapeHtml(titre)}</span>
+  </div>`;
+}
+
+// Petite fenêtre (pas une page dédiée) ouverte au clic sur une ligne de moyenne de présence :
+// liste les entraînements/matchs où le joueur a été marqué absent, puis présent, sur la même
+// période que la ligne cliquée. Fermeture via la croix ou un clic hors de la fenêtre ; bouton
+// "agrandir" pour passer en plein cadre (utile sur les périodes avec beaucoup d'événements).
+function renderPresenceDetailModal() {
+  const ctx = window.__presenceDetailFor;
+  if (!ctx) return "";
+  const { p, equipe, monthOnly } = ctx;
+  const { absences, presences } = computePresenceDetail(p, equipe, monthOnly);
+  const expanded = !!window.__presenceDetailExpanded;
+  const periodLabel = monthOnly ? new Date().toLocaleDateString("fr-FR", { month: "long" }) : "la saison";
+
+  return `<div class="presence-detail-overlay" data-presence-detail-close-bg="1">
+    <div class="presence-detail-sheet ${expanded ? "expanded" : ""}">
+      <div class="presence-detail-header">
+        <div class="presence-detail-title">${escapeHtml(p)} — ${periodLabel}</div>
+        <div class="presence-detail-expand" id="presence-detail-expand-toggle" title="${expanded ? "Réduire" : "Agrandir"}">${expanded ? "⤡" : "⤢"}</div>
+        <div class="modal-close" id="presence-detail-close">✕</div>
+      </div>
+      <div class="presence-detail-body">
+        <div class="section-h" style="margin-top:0;">Absences (${absences.length})</div>
+        ${absences.length === 0 ? `<div class="muted" style="margin-bottom:14px;">Aucune absence.</div>` : `<div style="margin-bottom:14px;">${absences.map(renderPresenceDetailEvRow).join("")}</div>`}
+        <div class="section-h">Présences (${presences.length})</div>
+        ${presences.length === 0 ? `<div class="muted">Aucune présence enregistrée.</div>` : presences.map(renderPresenceDetailEvRow).join("")}
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderPresencePage() {
@@ -88,6 +156,8 @@ function renderPresencePage() {
     html += `<div class="section-h">Passés</div>`;
     past.slice(0, 12).forEach(ev => { html += renderPresenceEventCard(ev, true, activeTeam); });
   }
+
+  html += renderPresenceDetailModal();
 
   return html;
 }
@@ -266,4 +336,31 @@ function attachPresenceEvents() {
       writePresence(date, session.nom, val);
     };
   });
+
+  document.querySelectorAll("[data-open-presence-detail]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      window.__presenceDetailFor = {
+        p: el.dataset.presenceDetailPlayer,
+        equipe: el.dataset.presenceDetailEquipe,
+        monthOnly: el.dataset.presenceDetailMonth === "1",
+      };
+      window.__presenceDetailExpanded = false;
+      render();
+    };
+  });
+
+  const presenceDetailBg = document.querySelector("[data-presence-detail-close-bg]");
+  if (presenceDetailBg) presenceDetailBg.onclick = (e) => {
+    if (e.target === presenceDetailBg) { window.__presenceDetailFor = null; render(); }
+  };
+
+  const presenceDetailClose = document.getElementById("presence-detail-close");
+  if (presenceDetailClose) presenceDetailClose.onclick = () => { window.__presenceDetailFor = null; render(); };
+
+  const presenceDetailExpandToggle = document.getElementById("presence-detail-expand-toggle");
+  if (presenceDetailExpandToggle) presenceDetailExpandToggle.onclick = () => {
+    window.__presenceDetailExpanded = !window.__presenceDetailExpanded;
+    render();
+  };
 }
