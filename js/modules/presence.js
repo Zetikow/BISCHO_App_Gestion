@@ -261,11 +261,12 @@ async function writePresence(dateKey, joueur, present) {
   render();
 }
 
+// present = "Oui" | "Non" | "" (vide = retire la réponse, pas encore répondu).
 async function writePresenceEvenementApi(eventId, nom, present) {
-  presenceEvenements[`${eventId}_${nom}`] = present ? "Oui" : "Non";
+  presenceEvenements[`${eventId}_${nom}`] = present;
   render();
   try {
-    await fetch(`${GOOGLE_SCRIPT_URL}?action=setPresenceEvenement&eventId=${encodeURIComponent(eventId)}&nom=${encodeURIComponent(nom)}&present=${present ? "Oui" : "Non"}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    await fetch(`${GOOGLE_SCRIPT_URL}?action=setPresenceEvenement&eventId=${encodeURIComponent(eventId)}&nom=${encodeURIComponent(nom)}&present=${encodeURIComponent(present)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     isOnline = true;
   } catch (err) { isOnline = false; }
   render();
@@ -295,8 +296,9 @@ function attachPresenceEvents() {
       vibrate();
       const eventId = el.dataset.markPresence;
       const player = el.dataset.markPlayer;
-      const val = el.dataset.markVal === "1";
-      writePresenceEvenementApi(eventId, player, val);
+      const wanted = el.dataset.markVal === "1" ? "Oui" : "Non";
+      const current = presenceEvenements[`${eventId}_${player}`];
+      writePresenceEvenementApi(eventId, player, current === wanted ? "" : wanted);
     };
   });
 

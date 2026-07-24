@@ -775,9 +775,13 @@ function attachAgendaEvents() {
     btn.onclick = (e) => {
       vibrate();
       const eventId = e.currentTarget.dataset.eventPresence;
-      const val = e.currentTarget.dataset.eventVal === "1";
-      writePresenceEvenementApi(eventId, session.nom, val);
-      if (val && presenceJustifications[`${eventId}_${session.nom}`]) {
+      const wanted = e.currentTarget.dataset.eventVal === "1" ? "Oui" : "Non";
+      // Recliquer sur le choix déjà actif le retire (retour à "pas encore répondu") — pas
+      // obligé de trancher Présent/Absent si on ne sait pas encore.
+      const current = presenceEvenements[`${eventId}_${session.nom}`];
+      const newVal = current === wanted ? "" : wanted;
+      writePresenceEvenementApi(eventId, session.nom, newVal);
+      if (newVal === "Oui" && presenceJustifications[`${eventId}_${session.nom}`]) {
         if (window.__justifEditing) window.__justifEditing[eventId] = false;
         writeJustificationApi(eventId, session.nom, "");
       }
