@@ -14,9 +14,10 @@
 // pendant le geste, voir isFormOpen() dans state.js.
 // ===================================================================
 
-// Zone libre (placement défensif) mise de côté pour l'instant, le temps de valider les postes
-// fixes du terrain — le backend (Compositions.gs) reste inchangé, seul l'affichage est masqué.
-const COMPOSITION_FREE_ZONE_ENABLED = false;
+// Zone libre (placement défensif) : un joueur déjà sur un poste fixe (terrain ou banc) peut en
+// plus être placé n'importe où dans cette zone, pour avoir à la fois son poste offensif et son
+// poste défensif affichés — voir api_setCompositionFreePos (Compositions.gs) qui l'exige déjà.
+const COMPOSITION_FREE_ZONE_ENABLED = true;
 
 const COMPOSITION_FIELD_SLOTS = ["GB", "AiG", "AiD", "PV", "ArG", "ArD", "DC"];
 const COMPOSITION_BENCH_SLOTS = ["Banc1", "Banc2", "Banc3", "Banc4", "Banc5"];
@@ -125,6 +126,9 @@ function renderCompositionCourt(matchId, readonly) {
       <rect x="170" y="8" width="60" height="12" fill="none" stroke="#0c0e16" stroke-width="3"/>
       <path d="M 60 20 A 140 140 0 0 0 340 20" fill="none" stroke="#0c0e16" stroke-width="3"/>
       <path d="M 20 70 A 190 190 0 0 0 380 70" fill="none" stroke="#0c0e16" stroke-width="2.5" stroke-dasharray="9 7"/>
+      <rect x="170" y="580" width="60" height="12" fill="none" stroke="#0c0e16" stroke-width="3"/>
+      <path d="M 60 580 A 140 140 0 0 1 340 580" fill="none" stroke="#0c0e16" stroke-width="3"/>
+      <path d="M 20 530 A 190 190 0 0 1 380 530" fill="none" stroke="#0c0e16" stroke-width="2.5" stroke-dasharray="9 7"/>
     </svg>
     ${fieldHtml}
     ${freeZoneHtml}
@@ -307,8 +311,8 @@ function compositionOnDragEnd(e) {
     compositionSetSlotApi(matchId, nom, target.dataset.compSlot);
   } else if (target.dataset.compFreeZone) {
     const rect = target.getBoundingClientRect();
-    const pctX = Math.min(96, Math.max(4, Math.round((e.clientX - rect.left) / rect.width * 100)));
-    const pctY = Math.min(90, Math.max(10, Math.round((e.clientY - rect.top) / rect.height * 100)));
+    const pctX = Math.min(98, Math.max(2, Math.round((e.clientX - rect.left) / rect.width * 100)));
+    const pctY = Math.min(98, Math.max(2, Math.round((e.clientY - rect.top) / rect.height * 100)));
     compositionSetFreePosApi(matchId, nom, pctX, pctY);
   } else if (target.dataset.compRosterDrop) {
     if (fromZone === "Libre") compositionSetFreePosApi(matchId, nom, "", "");
