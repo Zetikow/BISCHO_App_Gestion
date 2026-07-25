@@ -22,6 +22,10 @@ document.addEventListener("click", (e) => {
     window.__navExtraMenuOpen = false;
     render();
   }
+  if (window.__evMenuOpen && !e.target.closest(".ev-kebab-wrap")) {
+    window.__evMenuOpen = null;
+    render();
+  }
 });
 
 async function fetchLoginNoms(retriesLeft = 2) {

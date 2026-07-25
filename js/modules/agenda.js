@@ -709,6 +709,13 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
       <div class="ev-header-row">
         <div class="ev-title-big">${escapeHtml(displayTitre)}</div>
         <span class="ev-type-big ${typeClass(type)}">${type || "Événement"}</span>
+        ${canManage ? `<div class="ev-kebab-wrap">
+          <span class="ev-kebab" data-toggle-ev-menu="${id}">⋮</span>
+          ${window.__evMenuOpen === id ? `<div class="avatar-menu ev-menu">
+            <div class="avatar-menu-item" data-edit-event="${id}">✎ Modifier</div>
+            <div class="avatar-menu-item danger" data-delete-event="${id}">✕ Supprimer</div>
+          </div>` : ""}
+        </div>` : ""}
       </div>
       <div class="ev-date-full">${dateFr}${heureFmt ? " · " + heureFmt : ""}</div>
       <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
@@ -723,10 +730,6 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
       ) : ""}
       ${renderCompositionCardButtons(ev)}
     </div>
-    ${canManage ? `<div class="ev-actions">
-      ${iconBtn(ICON_EDIT, "ev-edit", `data-edit-event="${id}"`)}
-      ${iconBtn(ICON_CROSS, "ev-del", `data-delete-event="${id}"`)}
-    </div>` : ""}
   </div>`;
 }
 
@@ -945,15 +948,26 @@ function attachAgendaEvents() {
     addEvenementApi(date, heure, type, titre, lieu, equipe);
   };
 
+  document.querySelectorAll("[data-toggle-ev-menu]").forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      vibrate();
+      const id = el.dataset.toggleEvMenu;
+      window.__evMenuOpen = window.__evMenuOpen === id ? null : id;
+      render();
+    };
+  });
+
   document.querySelectorAll("[data-delete-event]").forEach(el => {
     el.onclick = () => {
+      window.__evMenuOpen = null;
       const id = el.dataset.deleteEvent;
       if (confirm("Supprimer cet événement ?")) deleteEvenementApi(id);
     };
   });
 
   document.querySelectorAll("[data-edit-event]").forEach(el => {
-    el.onclick = () => { window.__editingEvenementId = el.dataset.editEvent; render(); };
+    el.onclick = () => { window.__evMenuOpen = null; window.__editingEvenementId = el.dataset.editEvent; render(); };
   });
 
   document.querySelectorAll("[data-cancel-edit-event]").forEach(el => {
