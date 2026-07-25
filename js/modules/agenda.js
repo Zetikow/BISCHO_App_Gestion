@@ -703,19 +703,19 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
   const cascadeStyle = (!isPast && window.__pageJustChanged && typeof staggerIndex === "number")
     ? `animation:cardCascadeIn 0.35s ease-out forwards; animation-delay:${Math.min(staggerIndex * 0.06, 0.6)}s;`
     : "";
-  return `<div class="ev-card ${outcomeClass}" style="${isPast && !outcomeClass ? 'opacity:0.55;' : ''} ${cascadeStyle}">    <div class="ev-date"><div class="ev-day">${d.getDate()}</div><div class="ev-month">${d.toLocaleDateString("fr-FR", { month: "short" })}</div></div>
+  return `<div class="ev-card ${outcomeClass} ${canManage ? 'ev-has-kebab' : ''}" style="${isPast && !outcomeClass ? 'opacity:0.55;' : ''} ${cascadeStyle}">    <div class="ev-date"><div class="ev-day">${d.getDate()}</div><div class="ev-month">${d.toLocaleDateString("fr-FR", { month: "short" })}</div></div>
     <div class="ev-divider"></div>
     <div class="ev-info">
+      ${canManage ? `<div class="ev-kebab-wrap">
+        <span class="ev-kebab" data-toggle-ev-menu="${id}">⋮</span>
+        ${window.__evMenuOpen === id ? `<div class="avatar-menu ev-menu">
+          <div class="avatar-menu-item" data-edit-event="${id}">✎ Modifier</div>
+          <div class="avatar-menu-item danger" data-delete-event="${id}">✕ Supprimer</div>
+        </div>` : ""}
+      </div>` : ""}
       <div class="ev-header-row">
         <div class="ev-title-big">${escapeHtml(displayTitre)}</div>
         <span class="ev-type-big ${typeClass(type)}">${type || "Événement"}</span>
-        ${canManage ? `<div class="ev-kebab-wrap">
-          <span class="ev-kebab" data-toggle-ev-menu="${id}">⋮</span>
-          ${window.__evMenuOpen === id ? `<div class="avatar-menu ev-menu">
-            <div class="avatar-menu-item" data-edit-event="${id}">✎ Modifier</div>
-            <div class="avatar-menu-item danger" data-delete-event="${id}">✕ Supprimer</div>
-          </div>` : ""}
-        </div>` : ""}
       </div>
       <div class="ev-date-full">${dateFr}${heureFmt ? " · " + heureFmt : ""}</div>
       <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
