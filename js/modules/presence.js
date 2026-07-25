@@ -238,7 +238,7 @@ function renderPtypeCard(title, stats) {
     <div class="section-h">${title}</div>
     ${stats.map(s => `<div class="ptype-row">
       <div class="ptype-label">${s.type === "Entraînement" ? "Entraîn." : s.type}</div>
-      <div class="ptype-track"><div class="ptype-fill" style="width:${s.pct ?? 0}%"></div></div>
+      <div class="ptype-track"><div class="ptype-fill" data-fill-target="${s.pct ?? 0}" style="width:${window.__pageJustChanged ? 0 : (s.pct ?? 0)}%"></div></div>
       <div class="ptype-pct">${s.pct !== null ? s.pct + "%" : "—"}</div>
       <div class="ptype-sub">${s.total > 0 ? `${s.oui}/${s.total}` : "aucune donnée"}</div>
     </div>`).join("")}

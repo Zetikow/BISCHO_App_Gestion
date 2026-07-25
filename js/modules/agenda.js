@@ -585,6 +585,7 @@ function renderAgenda() {
   const upcoming = sorted.filter(ev => eventDateObj(ev) >= now);
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
 
+  let staggerIndex = 0;
   if (upcoming.length === 0) {
     html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir pour le moment.</div>`;
   } else {
@@ -595,13 +596,13 @@ function renderAgenda() {
         html += `<div class="section-h">${label}</div>`;
         lastLabel = label;
       }
-      html += renderEventCard(ev, canManage);
+      html += renderEventCard(ev, canManage, false, staggerIndex++);
     });
   }
 
   if (past.length > 0) {
     html += `<div class="section-h">Passés</div>`;
-    past.slice(0, 8).forEach(ev => { html += renderEventCard(ev, canManage, true); });
+    past.slice(0, 8).forEach(ev => { html += renderEventCard(ev, canManage, true, staggerIndex++); });
   }
 
   if (window.__compositionMatchId) html += renderCompositionEditor(window.__compositionMatchId);
@@ -631,7 +632,7 @@ function renderJustifBlock(eventId) {
   </div>`;
 }
 
-function renderEventCard(ev, canManage, isPast) {
+function renderEventCard(ev, canManage, isPast, staggerIndex) {
   const [id, date, heure, type, titre, lieu, equipe, score] = ev;
   const d = eventDateObj(ev);
   const presIdentity = myPresenceIdentity();
@@ -696,7 +697,13 @@ function renderEventCard(ev, canManage, isPast) {
     }
   }
 
-  return `<div class="ev-card ${outcomeClass}" style="${isPast && !outcomeClass ? 'opacity:0.55;' : ''}">    <div class="ev-date"><div class="ev-day">${d.getDate()}</div><div class="ev-month">${d.toLocaleDateString("fr-FR", { month: "short" })}</div></div>
+  // Cascade d'entrée uniquement lors d'un vrai changement de page (window.__pageJustChanged,
+  // voir render.js) — sinon le rafraîchissement périodique (fetchAll toutes les 8-10s) rejouerait
+  // l'animation en boucle sur des cartes identiques.
+  const cascadeStyle = (!isPast && window.__pageJustChanged && typeof staggerIndex === "number")
+    ? `animation:cardCascadeIn 0.35s ease-out forwards; animation-delay:${Math.min(staggerIndex * 0.06, 0.6)}s;`
+    : "";
+  return `<div class="ev-card ${outcomeClass}" style="${isPast && !outcomeClass ? 'opacity:0.55;' : ''} ${cascadeStyle}">    <div class="ev-date"><div class="ev-day">${d.getDate()}</div><div class="ev-month">${d.toLocaleDateString("fr-FR", { month: "short" })}</div></div>
     <div class="ev-divider"></div>
     <div class="ev-info">
       <div class="ev-header-row">

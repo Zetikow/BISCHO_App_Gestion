@@ -26,6 +26,19 @@ function attachEvents() {
   attachGalerieEvents();
   attachProfilEvents();
   attachSupportEvents();
+  animateFillBars();
+}
+
+// Fait passer les barres de progression (.ptype-fill, moyenne de présence par type) de 0 à leur
+// valeur réelle — seulement lors d'un vrai changement de page (window.__pageJustChanged, voir
+// render.js), jamais lors d'un rafraîchissement périodique où elles sont déjà à la bonne largeur.
+function animateFillBars() {
+  if (!window.__pageJustChanged) return;
+  const bars = document.querySelectorAll(".ptype-fill[data-fill-target]");
+  if (bars.length === 0) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bars.forEach(bar => { bar.style.width = bar.dataset.fillTarget + "%"; });
+  }));
 }
 
 function attachCoreNavEvents() {
