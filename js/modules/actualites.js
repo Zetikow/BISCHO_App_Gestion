@@ -82,12 +82,27 @@ function renderActualitesPage() {
 // ===================== ACTIONS API =====================
 
 async function addActualiteApi(titre, scope, texte) {
+  const tempId = "temp_" + Date.now();
+  const today = new Date().toISOString().slice(0, 10);
+  actualites.push([tempId, titre, scope, texte, session.nom, today]);
+  window.__showAddActualite = false;
+  render();
   try {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=addActualite&titre=${encodeURIComponent(titre)}&scope=${encodeURIComponent(scope)}&texte=${encodeURIComponent(texte)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     const data = await res.json();
-    showToast(data.ok ? "Ajout réussi" : "Échec de l'ajout", data.ok ? "success" : "error");
-    if (data.ok) { window.__showAddActualite = false; await fetchAll(); } else { render(); }
-  } catch (err) { isOnline = false; showToast("Échec de l'ajout", "error"); render(); }
+    if (data.ok) {
+      await fetchAll();
+    } else {
+      actualites = actualites.filter(a => a[0] !== tempId);
+      showToast("Échec de l'ajout", "error");
+      render();
+    }
+  } catch (err) {
+    isOnline = false;
+    actualites = actualites.filter(a => a[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
 }
 
 async function deleteActualiteApi(id) {

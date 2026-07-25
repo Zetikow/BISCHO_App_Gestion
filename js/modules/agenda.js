@@ -726,12 +726,30 @@ function renderEventCard(ev, canManage, isPast) {
 // ===================== ACTIONS API =====================
 
 async function addEvenementApi(date, heure, type, titre, lieu, equipe) {
+  // Optimiste : on ferme le formulaire et on affiche la carte tout de suite (id provisoire),
+  // sans attendre l'aller-retour serveur — voir fetchAll() qui remplace ensuite cette liste par
+  // la version serveur (id définitif) une fois la réponse arrivée.
+  const finalEquipe = equipe || primaryEquipe();
+  const tempId = "temp_" + Date.now();
+  evenements.push([tempId, date, heure, type, titre, lieu, finalEquipe, ""]);
+  showAddEvent = false;
+  render();
   try {
-    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=addEvenement&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&equipe=${encodeURIComponent(equipe || primaryEquipe())}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=addEvenement&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&equipe=${encodeURIComponent(finalEquipe)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     const data = await res.json();
-    showToast(data.ok ? "Ajout réussi" : `Échec : ${data.error || "erreur"}${data.detail ? " — " + data.detail : ""}`, data.ok ? "success" : "error");
-    if (data.ok) { showAddEvent = false; await fetchAll(); } else { render(); }
-  } catch (err) { isOnline = false; showToast("Échec de l'ajout", "error"); render(); }
+    if (data.ok) {
+      await fetchAll();
+    } else {
+      evenements = evenements.filter(ev => ev[0] !== tempId);
+      showToast(`Échec : ${data.error || "erreur"}${data.detail ? " — " + data.detail : ""}`, "error");
+      render();
+    }
+  } catch (err) {
+    isOnline = false;
+    evenements = evenements.filter(ev => ev[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
 }
 
 async function deleteEvenementApi(id) {

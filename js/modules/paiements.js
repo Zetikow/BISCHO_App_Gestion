@@ -121,12 +121,26 @@ function renderPaiementsPage() {
 // ===================== ACTIONS API =====================
 
 async function addPaiement(joueur, montant, commentaire) {
+  const tempId = "temp_" + Date.now();
+  const today = new Date().toISOString().slice(0, 10);
+  paiements.push([tempId, joueur, montant, today, commentaire || ""]);
+  render();
   try {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=addPaiement&joueur=${encodeURIComponent(joueur)}&montant=${montant}&commentaire=${encodeURIComponent(commentaire || "")}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
     const data = await res.json();
-    showToast(data.ok ? "Ajout réussi" : "Échec de l'ajout", data.ok ? "success" : "error");
-    await fetchAll();
-  } catch (err) { isOnline = false; showToast("Échec de l'ajout", "error"); render(); }
+    if (data.ok) {
+      await fetchAll();
+    } else {
+      paiements = paiements.filter(p => p[0] !== tempId);
+      showToast("Échec de l'ajout", "error");
+      render();
+    }
+  } catch (err) {
+    isOnline = false;
+    paiements = paiements.filter(p => p[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
 }
 
 async function updatePaiementApi(id, joueur, montant, commentaire) {
