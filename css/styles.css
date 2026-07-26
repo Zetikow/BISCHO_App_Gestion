@@ -2,7 +2,7 @@
   --accent: #4275d4;
   --accent2: #5a8fe8;
   --gold: #e0a639;
-  --grad: linear-gradient(135deg, #3763c9, #4f83e0);
+  --grad: linear-gradient(135deg, #0d1b33 0%, #4275d4 55%, #eef2fa 100%);
   --glow: radial-gradient(circle, rgba(66,117,212,0.35), transparent 70%);
   --font-disp: 'DM Sans', sans-serif;
 }
