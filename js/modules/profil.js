@@ -132,21 +132,6 @@ function renderProfilPage() {
   </div></div>`;
 
 
-  // Rôle dans le club + Poste, côte à côte — carte "Rôle" volontairement compacte, l'essentiel
-  // (matchs / brûlage) est mis en avant juste en dessous plutôt qu'ici.
-  html += `<div style="display:flex; gap:10px; align-items:flex-start;">
-    <div class="card" style="flex:1; min-width:0; padding:10px;">
-      <div class="section-h" style="margin:0 0 6px; font-size:11px;">Rôle dans le club</div>
-      <div style="display:flex; flex-wrap:wrap; gap:5px;">
-        ${(session.roles || []).map(r => {
-          const showTeam = r.role === "Joueur" || r.role === "Coach";
-          return `<span class="badge">${r.role}${showTeam ? " " + teamDisplayLabel(r.equipe || "SM1") : ""}</span>`;
-        }).join("")}
-      </div>
-    </div>
-    ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
-  </div>`;
-
   // Mes matchs + brûlage — carte perso par équipe, affichée seulement si pertinente pour CE
   // compte : Joueur inscrit dans cette équipe précise, ou déjà brûlé au moins un match dedans
   // (cas d'un joueur SM2 appelé en SM1, par ex.) — pas juste "a le rôle Joueur quelque part"
@@ -154,12 +139,31 @@ function renderProfilPage() {
   const mesJoueurTeams = equipesForRole("Joueur");
   const myBruleSM1 = bruleMatchesForSM1(session.nom);
   const myBruleU17M1 = bruleMatchesForU17M1(session.nom);
+  let mesMatchsHtml = "";
   if (mesJoueurTeams.includes("SM1") || myBruleSM1 > 0) {
-    html += renderMesMatchsCard("SM1", myBruleSM1, BRULAGE_MAX_MATCHES_SM1);
+    mesMatchsHtml += renderMesMatchsCard("SM1", myBruleSM1, BRULAGE_MAX_MATCHES_SM1);
   }
   if (mesJoueurTeams.includes("U17M1") || myBruleU17M1 > 0) {
-    html += renderMesMatchsCard("U17M1", myBruleU17M1, BRULAGE_MAX_MATCHES_U17M1);
+    mesMatchsHtml += renderMesMatchsCard("U17M1", myBruleU17M1, BRULAGE_MAX_MATCHES_U17M1);
   }
+
+  // Rôle dans le club (réduite) + mes matchs empilés dans la colonne de gauche, Poste à droite —
+  // les deux colonnes font à peu près la même hauteur au lieu d'un grand vide sous "Rôle".
+  html += `<div style="display:flex; gap:10px; align-items:flex-start;">
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
+      <div class="card" style="padding:8px;">
+        <div class="section-h" style="margin:0 0 5px; font-size:10.5px;">Rôle dans le club</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+          ${(session.roles || []).map(r => {
+            const showTeam = r.role === "Joueur" || r.role === "Coach";
+            return `<span class="badge">${r.role}${showTeam ? " " + teamDisplayLabel(r.equipe || "SM1") : ""}</span>`;
+          }).join("")}
+        </div>
+      </div>
+      ${mesMatchsHtml}
+    </div>
+    ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
+  </div>`;
 
   html += EMAIL_REMINDER_UI_VISIBLE ? renderEmailCard(myRow) : "";
 
