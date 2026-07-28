@@ -134,7 +134,7 @@ function renderProfilPage() {
 
   // Rôle dans le club + Poste, côte à côte — carte "Rôle" volontairement compacte, l'essentiel
   // (matchs / brûlage) est mis en avant juste en dessous plutôt qu'ici.
-  html += `<div style="display:flex; gap:10px; align-items:stretch;">
+  html += `<div style="display:flex; gap:10px; align-items:flex-start;">
     <div class="card" style="flex:1; min-width:0; padding:10px;">
       <div class="section-h" style="margin:0 0 6px; font-size:11px;">Rôle dans le club</div>
       <div style="display:flex; flex-wrap:wrap; gap:5px;">
@@ -147,12 +147,18 @@ function renderProfilPage() {
     ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
   </div>`;
 
-  // Mes matchs (SM1 et U17M1) + brûlage — cartes perso, visibles pour tout Joueur (pertinent
-  // même pour un joueur SM2 déjà appelé en SM1, ou U17M1 selon le cas). Voir bruleMatchesForSM1
-  // / bruleMatchesForU17M1 (composition.js).
-  if (hasRole("Joueur")) {
-    html += renderMesMatchsCard("SM1", bruleMatchesForSM1(session.nom), BRULAGE_MAX_MATCHES_SM1);
-    html += renderMesMatchsCard("U17M1", bruleMatchesForU17M1(session.nom), BRULAGE_MAX_MATCHES_U17M1);
+  // Mes matchs + brûlage — carte perso par équipe, affichée seulement si pertinente pour CE
+  // compte : Joueur inscrit dans cette équipe précise, ou déjà brûlé au moins un match dedans
+  // (cas d'un joueur SM2 appelé en SM1, par ex.) — pas juste "a le rôle Joueur quelque part"
+  // (un Coach U17M1 qui joue en SM1 n'a pas besoin de voir sa carte U17M1).
+  const mesJoueurTeams = equipesForRole("Joueur");
+  const myBruleSM1 = bruleMatchesForSM1(session.nom);
+  const myBruleU17M1 = bruleMatchesForU17M1(session.nom);
+  if (mesJoueurTeams.includes("SM1") || myBruleSM1 > 0) {
+    html += renderMesMatchsCard("SM1", myBruleSM1, BRULAGE_MAX_MATCHES_SM1);
+  }
+  if (mesJoueurTeams.includes("U17M1") || myBruleU17M1 > 0) {
+    html += renderMesMatchsCard("U17M1", myBruleU17M1, BRULAGE_MAX_MATCHES_U17M1);
   }
 
   html += EMAIL_REMINDER_UI_VISIBLE ? renderEmailCard(myRow) : "";
