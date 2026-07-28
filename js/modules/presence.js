@@ -31,6 +31,45 @@ function computeAverages(equipe, monthOnly) {
   }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
 }
 
+// Série en cours par joueur (consécutif de "Oui" en partant de l'événement passé le plus
+// récent, en remontant) — s'arrête au premier "Non" ; un événement sans réponse est ignoré
+// (ni cassé ni compté), comme pour la moyenne (computeAverages) qui exclut déjà ce cas.
+function computePresenceStreaks(equipe) {
+  const roster = rosterForEquipe(equipe);
+  const now = new Date();
+  const evs = evenements.filter(ev => eventEquipe(ev) === equipe && eventDateObj(ev) < now)
+    .sort((a, b) => eventDateObj(b) - eventDateObj(a));
+  return roster.map(p => {
+    let streak = 0;
+    for (const ev of evs) {
+      const v = presenceEvenements[`${ev[0]}_${p}`];
+      if (v === "Oui") streak++;
+      else if (v === "Non") break;
+    }
+    return { p, streak };
+  }).sort((a, b) => b.streak - a.streak);
+}
+
+// Carte "série + classement présence" — sous les moyennes saison/mois, se recalcule à chaque
+// affichage (pas de maintenance manuelle). Classement buteur/passeur à ajouter plus tard, une
+// fois les stats de match saisies quelque part.
+function renderPresenceStreakCard(equipe) {
+  const streaks = computePresenceStreaks(equipe);
+  if (streaks.length === 0) return "";
+  const presIdentity = myPresenceIdentity();
+  const mine = streaks.find(s => s.p === presIdentity.nom);
+  const top3 = streaks.filter(s => s.streak > 0).slice(0, 3);
+  return `<div class="card">
+    ${mine && mine.streak > 0 ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+      <span style="font-size:20px;">🔥</span>
+      <div><div style="color:#fff; font-weight:800; font-size:13px;">${mine.streak} match${mine.streak > 1 ? "s" : ""} d'affilée</div><div class="muted" style="font-size:10.5px;">sans absence</div></div>
+    </div>` : ""}
+    <div class="section-h" style="margin-bottom:6px;">Classement présence</div>
+    ${top3.length === 0 ? `<div class="muted">Pas encore de série en cours.</div>` : top3.map((s, i) => `<div class="presence-row"><div>${i + 1}. ${escapeHtml(s.p)}</div><div style="color:#ffc94a; font-weight:700; font-size:12px;">${s.streak} d'affilée</div></div>`).join("")}
+    <div class="muted" style="font-size:9.5px; margin-top:8px; font-style:italic;">Classement buteur/passeur à venir dès que les stats de match seront saisies.</div>
+  </div>`;
+}
+
 function renderAverageCard(equipe, monthOnly) {
   const stats = computeAverages(equipe, monthOnly);
   const stateKey = monthOnly ? "__monthAvgExpanded" : "__seasonAvgExpanded";
@@ -151,6 +190,7 @@ function renderPresencePage() {
 
   html += renderAverageCard(activeTeam, false);
   html += renderAverageCard(activeTeam, true);
+  html += renderPresenceStreakCard(activeTeam);
 
   if (upcoming.length === 0) {
     html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir.</div>`;

@@ -215,6 +215,62 @@ function attachLoginEvents() {
 
 // ---------- Accueil ----------
 
+// Lundi 00h00 → dimanche 23h59 de la semaine calendaire en cours (pas "les 7 prochains
+// jours" — ici on veut aussi les événements déjà passés cette semaine, pour le récap).
+function recapWeekBounds() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+}
+
+// Récap hebdo affiché juste sous la carte "Prochain événement" — chiffres uniquement tirés de
+// données déjà datées (Evenements, Actualites) : pas de delta caisse noire, la feuille Grid ne
+// garde que des totaux cumulés par action, pas un historique daté par semaine.
+function renderWeeklyRecapCard() {
+  const { monday, sunday } = recapWeekBounds();
+  const weekEvs = sortedVisibleEvenements().filter(ev => {
+    const d = eventDateObj(ev);
+    return d >= monday && d <= sunday && (typeClass(ev[3]) === "match" || typeClass(ev[3]) === "entrainement");
+  });
+  const presIdentity = myPresenceIdentity();
+  let oui = 0, total = 0;
+  weekEvs.forEach(ev => {
+    const v = presenceEvenements[`${ev[0]}_${presIdentity.nom}`];
+    if (v === "Oui" || v === "Non") { total++; if (v === "Oui") oui++; }
+  });
+  const pct = total > 0 ? Math.round((oui / total) * 100) : null;
+  const actusCount = visibleActualites().filter(a => {
+    const d = a[5] ? new Date(a[5]) : null;
+    return d && d >= monday && d <= sunday;
+  }).length;
+  const pctColor = pct === null ? "#e4e8f2" : (pct >= 75 ? "#78c850" : (pct >= 50 ? "#ffb43c" : "#ff5a5a"));
+
+  return `<div class="card">
+    <div class="section-h" style="margin-top:0;">Cette semaine</div>
+    <div style="display:flex; gap:8px;">
+      <div style="background:#1a1f30; border-radius:10px; padding:8px 6px; flex:1; text-align:center;">
+        <div style="color:#fff; font-weight:800; font-size:15px;">${weekEvs.length}</div>
+        <div class="muted" style="font-size:8.5px; margin-top:2px; line-height:1.3;">matchs +<br/>entraînements</div>
+      </div>
+      <div style="background:#1a1f30; border-radius:10px; padding:8px 6px; flex:1; text-align:center;">
+        <div style="color:${pctColor}; font-weight:800; font-size:15px;">${pct === null ? "—" : pct + "%"}</div>
+        <div class="muted" style="font-size:8.5px; margin-top:2px; line-height:1.3;">présence<br/>cette semaine</div>
+      </div>
+      <div style="background:#1a1f30; border-radius:10px; padding:8px 6px; flex:1; text-align:center;">
+        <div style="color:#ffc94a; font-weight:800; font-size:15px;">${actusCount}</div>
+        <div class="muted" style="font-size:8.5px; margin-top:2px; line-height:1.3;">actu${actusCount > 1 ? "s" : ""}<br/>publiée${actusCount > 1 ? "s" : ""}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderHome() {
   const canManage = hasRole("Coach") || hasRole("Admin");
   let html = "";
@@ -250,6 +306,7 @@ function renderHome() {
   }
 
   html += renderNextEventCard();
+  html += renderWeeklyRecapCard();
 
   // Stats compactes : caisse noire (SM1 uniquement, structure Grid figée) + présence perso
   // (tirée du roster réel de l'équipe, pas de la liste PLAYERS figée — sinon un joueur peut
