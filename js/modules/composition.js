@@ -33,7 +33,7 @@ const COMPOSITION_SLOT_LABELS = {
 };
 
 function compositionRoster() {
-  return rosterForEquipe("U17");
+  return rosterForEquipe("U17M1");
 }
 
 function compositionSlotsFor(matchId) {
@@ -52,10 +52,10 @@ function compositionIsPublished(matchId) {
   return !!(row && row[1] === "1");
 }
 
-// Brûlage U17 : nombre de matchs U17 où le joueur apparaît dans la composition publiée
-// (mécanisme existant, comme ASHS). Plafond BRULAGE_MAX_MATCHES_U17, voir club-config.js.
-function bruleMatchesForU17(nom) {
-  return evenements.filter(ev => eventEquipe(ev) === "U17" && typeClass(ev[3]) === "match"
+// Brûlage U17M1 : nombre de matchs U17M1 où le joueur apparaît dans la composition publiée
+// (mécanisme existant, comme ASHS). Plafond BRULAGE_MAX_MATCHES_U17M1, voir club-config.js.
+function bruleMatchesForU17M1(nom) {
+  return evenements.filter(ev => eventEquipe(ev) === "U17M1" && typeClass(ev[3]) === "match"
     && compositionIsPublished(ev[0]) && Object.values(compositionSlotsFor(ev[0])).includes(nom)).length;
 }
 
@@ -71,7 +71,7 @@ function bruleMatchesForSM1(nom) {
 // composition publiée voit un badge verrouillé "Non sélectionné" à la place du toggle
 // Présent/Absent habituel — voir renderEventCard (agenda.js).
 function compositionNonSelected(ev, nom) {
-  if (eventEquipe(ev) !== "U17" || typeClass(ev[3]) !== "match") return false;
+  if (eventEquipe(ev) !== "U17M1" || typeClass(ev[3]) !== "match") return false;
   const matchId = ev[0];
   if (!compositionIsPublished(matchId)) return false;
   if (presenceEvenements[`${matchId}_${nom}`] !== "Oui") return false;
@@ -93,7 +93,7 @@ function compositionPlayerAvatar(nom, cls) {
 // voient toujours le bouton d'édition ; joueurs/parents ne voient un bouton (lecture seule) que
 // si le coach a explicitement publié la composition.
 function renderCompositionCardButtons(ev) {
-  if (eventEquipe(ev) !== "U17" || typeClass(ev[3]) !== "match") return "";
+  if (eventEquipe(ev) !== "U17M1" || typeClass(ev[3]) !== "match") return "";
   const matchId = ev[0];
   const canManage = hasRole("Coach") || hasRole("Admin");
   const published = compositionIsPublished(matchId);
@@ -172,7 +172,7 @@ function renderCompositionEditor(matchId) {
   return `<div class="modal-overlay composition-overlay">
     <div class="modal-header">
       <div class="modal-close" id="composition-close">✕</div>
-      <div class="modal-title">Composition ${escapeHtml(ev[4] || "U17")}</div>
+      <div class="modal-title">Composition ${escapeHtml(ev[4] || "U17M1")}</div>
       <div class="composition-cap">${occupiedCount} / 12 places</div>
     </div>
     <div class="composition-body">
@@ -210,7 +210,7 @@ function renderCompositionPlayerView(matchId) {
   return `<div class="modal-overlay composition-overlay">
     <div class="modal-header">
       <div class="modal-close" id="composition-view-close">✕</div>
-      <div class="modal-title">Composition ${escapeHtml(ev[4] || "U17")}</div>
+      <div class="modal-title">Composition ${escapeHtml(ev[4] || "U17M1")}</div>
     </div>
     <div class="composition-body">
       <div class="composition-court-col">

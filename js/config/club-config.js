@@ -39,19 +39,19 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 // Ton identifiant PayPal.me (ex: "HBCBischoffsheim" pour paypal.me/HBCBischoffsheim).
 // Laisse vide "" tant que ce n'est pas créé : le bouton Payer reste alors simplement masqué.
 const PAYPAL_ME_USERNAME = "CaisseNoireHBCB";
-const TEAMS = ["SM1", "U17", "SM2"];
+const TEAMS = ["SM1", "U17M1", "SM2"];
 
-// Libellé affiché pour une équipe, si différent de son identifiant interne (TEAMS/eventEquipe
-// restent "U17" côté données — changer ça toucherait les comptes déjà enregistrés dans Google
-// Sheets — seul l'affichage change ici). Voir teamDisplayLabel().
-const TEAM_DISPLAY_LABELS = { U17: "U17M1" };
+// U17 a été renommée U17M1 partout (code + données Google Sheets, voir migrateU17ToU17M1()
+// dans apps-script/Setup.gs). teamDisplayLabel() ne sert plus qu'à d'éventuels futurs cas
+// d'affichage ≠ identifiant interne — vide pour l'instant.
+const TEAM_DISPLAY_LABELS = {};
 function teamDisplayLabel(equipe) { return TEAM_DISPLAY_LABELS[equipe] || equipe; }
 
 // Brûlage : nombre max de matchs avant de ne plus pouvoir redescendre dans l'équipe inférieure.
 // SM1 se base sur la Sélection match (feuille "Selections", pas de composition publiée pour
-// cette équipe) ; U17 se base sur la composition publiée (comme avant), voir composition.js.
+// cette équipe) ; U17M1 se base sur la composition publiée (comme avant), voir composition.js.
 const BRULAGE_MAX_MATCHES_SM1 = 11;
-const BRULAGE_MAX_MATCHES_U17 = 10;
+const BRULAGE_MAX_MATCHES_U17M1 = 10;
 
 // Nombre de places pour la sélection d'un match (compteur "x/12" affiché sur la carte).
 const SELECTION_MAX_PLAYERS = 12;
@@ -66,7 +66,7 @@ const EMAIL_REMINDER_UI_VISIBLE = true;
 // pas des URLs d'iframe. Laisse vide "" tant que le widget n'est pas encore créé.
 const SCORENCO_WIDGET_IDS = {
   SM1: "192700",
-  U17: "",
+  U17M1: "",
   SM2: "",
 };
 // Nom affiché sur le widget Score'n'co le temps qu'il charge.

@@ -94,6 +94,19 @@ function renderEmailCard(myRow) {
   </div>`;
 }
 
+// Carte "Mes matchs en X" (brûlage perso) — voir renderProfilPage.
+function renderMesMatchsCard(equipe, brule, bruleMax) {
+  const remaining = Math.max(0, bruleMax - brule);
+  const bruleColor = brule >= bruleMax ? "#ff5a5a" : (brule >= bruleMax - 2 ? "#ffb43c" : "#33d17a");
+  return `<div class="card">
+    <div class="section-h" style="margin-top:0;">Mes matchs en ${escapeHtml(teamDisplayLabel(equipe))}</div>
+    <div style="display:flex; gap:16px;">
+      <div><div class="big-number" style="color:${bruleColor};">${brule}</div><div class="muted" style="font-size:10.5px;">matchs joués en ${escapeHtml(teamDisplayLabel(equipe))}</div></div>
+      <div><div class="big-number">${remaining}</div><div class="muted" style="font-size:10.5px;">avant d'être brûlé (max ${bruleMax})</div></div>
+    </div>
+  </div>`;
+}
+
 function renderProfilPage() {
   const myRow = findCompteRow(session.nom);
   const postes = currentPostes();
@@ -134,19 +147,12 @@ function renderProfilPage() {
     ${canEditPoste ? `<div class="card" style="flex:1; min-width:0;">${renderPosteCard(postes, true)}</div>` : ""}
   </div>`;
 
-  // Mes matchs en SM1 + brûlage — carte perso, visible pour tout Joueur (pertinent même pour
-  // un joueur SM2/U17 déjà appelé en SM1). Voir bruleMatchesForSM1 (composition.js).
+  // Mes matchs (SM1 et U17M1) + brûlage — cartes perso, visibles pour tout Joueur (pertinent
+  // même pour un joueur SM2 déjà appelé en SM1, ou U17M1 selon le cas). Voir bruleMatchesForSM1
+  // / bruleMatchesForU17M1 (composition.js).
   if (hasRole("Joueur")) {
-    const myBruleSM1 = bruleMatchesForSM1(session.nom);
-    const remaining = Math.max(0, BRULAGE_MAX_MATCHES_SM1 - myBruleSM1);
-    const bruleColor = myBruleSM1 >= BRULAGE_MAX_MATCHES_SM1 ? "#ff5a5a" : (myBruleSM1 >= BRULAGE_MAX_MATCHES_SM1 - 2 ? "#ffb43c" : "#33d17a");
-    html += `<div class="card">
-      <div class="section-h" style="margin-top:0;">Mes matchs en SM1</div>
-      <div style="display:flex; gap:16px;">
-        <div><div class="big-number" style="color:${bruleColor};">${myBruleSM1}</div><div class="muted" style="font-size:10.5px;">matchs joués en SM1</div></div>
-        <div><div class="big-number">${remaining}</div><div class="muted" style="font-size:10.5px;">avant d'être brûlé (max ${BRULAGE_MAX_MATCHES_SM1})</div></div>
-      </div>
-    </div>`;
+    html += renderMesMatchsCard("SM1", bruleMatchesForSM1(session.nom), BRULAGE_MAX_MATCHES_SM1);
+    html += renderMesMatchsCard("U17M1", bruleMatchesForU17M1(session.nom), BRULAGE_MAX_MATCHES_U17M1);
   }
 
   html += EMAIL_REMINDER_UI_VISIBLE ? renderEmailCard(myRow) : "";
@@ -175,8 +181,8 @@ function renderProfilPage() {
     const mesJoueurs = comptes.slice(1).filter(c => rowHasRole(c, "Joueur") && rowEquipesForRole(c, "Joueur").indexOf(chosenCoachTeam) !== -1);
     const showAll = !!window.__profilJoueursExpanded;
     const visible = showAll ? mesJoueurs : mesJoueurs.slice(0, 4);
-    const bruleFor = chosenCoachTeam === "SM1" ? bruleMatchesForSM1 : (chosenCoachTeam === "U17" ? bruleMatchesForU17 : null);
-    const bruleMax = chosenCoachTeam === "SM1" ? BRULAGE_MAX_MATCHES_SM1 : (chosenCoachTeam === "U17" ? BRULAGE_MAX_MATCHES_U17 : 0);
+    const bruleFor = chosenCoachTeam === "SM1" ? bruleMatchesForSM1 : (chosenCoachTeam === "U17M1" ? bruleMatchesForU17M1 : null);
+    const bruleMax = chosenCoachTeam === "SM1" ? BRULAGE_MAX_MATCHES_SM1 : (chosenCoachTeam === "U17M1" ? BRULAGE_MAX_MATCHES_U17M1 : 0);
     html += `<div class="card">
       <div class="section-h">Mes joueurs (${mesJoueurs.length})</div>
       ${mesJoueurs.length === 0 ? `<div class="muted">Aucun joueur trouvé pour cette équipe.</div>` : visible.map(j => {

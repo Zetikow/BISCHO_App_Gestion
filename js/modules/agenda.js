@@ -497,7 +497,7 @@ function renderGenerateTrainingsForm(equipe) {
     defMardiDate = formatDateKey(SEASON_START);
     defJeudiDate = formatDateKey(SEASON_START);
     defJeudiHeure = "20:15";
-  } else if (equipe === "U17") {
+  } else if (equipe === "U17M1") {
     defMardiDate = "2026-09-01"; defMardiHeure = "18:30"; defMardiLieu = DEFAULT_VENUE_NAME;
     defJeudiDate = "2026-09-03"; defJeudiHeure = "18:30"; defJeudiLieu = "Gymnase Rosheim";
   }
