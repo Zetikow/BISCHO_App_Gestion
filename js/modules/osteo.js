@@ -141,7 +141,7 @@ function renderOsteoManagerView() {
     html += `<div class="add-form">
       <label class="field-label">Équipe concernée</label>
       <select id="osteo-slot-equipe">
-        ${TEAMS.map(t => `<option value="${t}">${t}</option>`).join("")}
+        ${TEAMS.map(t => `<option value="${t}">${teamDisplayLabel(t)}</option>`).join("")}
         <option value="Toutes">Toutes</option>
       </select>
       <label class="field-label">Date</label>

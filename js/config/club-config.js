@@ -41,6 +41,12 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const PAYPAL_ME_USERNAME = "CaisseNoireHBCB";
 const TEAMS = ["SM1", "U17", "SM2"];
 
+// Libellé affiché pour une équipe, si différent de son identifiant interne (TEAMS/eventEquipe
+// restent "U17" côté données — changer ça toucherait les comptes déjà enregistrés dans Google
+// Sheets — seul l'affichage change ici). Voir teamDisplayLabel().
+const TEAM_DISPLAY_LABELS = { U17: "U17M1" };
+function teamDisplayLabel(equipe) { return TEAM_DISPLAY_LABELS[equipe] || equipe; }
+
 // Brûlage : nombre max de matchs avant de ne plus pouvoir redescendre dans l'équipe inférieure.
 // SM1 se base sur la Sélection match (feuille "Selections", pas de composition publiée pour
 // cette équipe) ; U17 se base sur la composition publiée (comme avant), voir composition.js.

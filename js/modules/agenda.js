@@ -563,7 +563,7 @@ function renderAgenda() {
         <input id="ev-lieu" type="text" value="${DEFAULT_VENUE_NAME}" />
         ${(hasRole("Admin")) ? `<label class="field-label">Équipe</label>
         <select id="ev-equipe">
-          ${TEAMS.map(t => `<option value="${t}" ${activeTeam === t ? "selected" : ""}>${t}</option>`).join("")}
+          ${TEAMS.map(t => `<option value="${t}" ${activeTeam === t ? "selected" : ""}>${teamDisplayLabel(t)}</option>`).join("")}
           <option value="Toutes" ${activeTeam === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
         </select>` : ""}
         <button class="btn" id="submit-add-event" style="margin-top:4px;">Enregistrer l'événement</button>
@@ -661,7 +661,7 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
       <input id="edit-ev-lieu-${id}" type="text" value="${lieu || ''}" />
       ${(hasRole("Admin") || hasRole("Salarié")) ? `<label class="field-label">Équipe</label>
       <select id="edit-ev-equipe-${id}">
-        ${TEAMS.map(t => `<option value="${t}" ${(equipe || "SM1") === t ? "selected" : ""}>${t}</option>`).join("")}
+        ${TEAMS.map(t => `<option value="${t}" ${(equipe || "SM1") === t ? "selected" : ""}>${teamDisplayLabel(t)}</option>`).join("")}
         <option value="Toutes" ${equipe === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
       </select>` : ""}
       ${type === "Match" ? (() => {

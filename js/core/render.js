@@ -8,7 +8,7 @@
 function renderTeamSwitcher(teams, active, dataAttr) {
   if (teams.length <= 1) return "";
   return `<div class="team-switch-row">
-    ${teams.map(t => `<button type="button" class="team-switch-btn ${t === active ? 'active' : ''}" data-${dataAttr}="${t}">${t}</button>`).join("")}
+    ${teams.map(t => `<button type="button" class="team-switch-btn ${t === active ? 'active' : ''}" data-${dataAttr}="${t}">${teamDisplayLabel(t)}</button>`).join("")}
   </div>`;
 }
 
