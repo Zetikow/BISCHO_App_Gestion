@@ -40,6 +40,8 @@ function api_getAll(ss, e) {
   const compositions = compositionsSheet ? compositionsSheet.getDataRange().getValues() : [];
   const compositionsMetaSheet = ss.getSheetByName("CompositionsMeta");
   const compositionsMeta = compositionsMetaSheet ? compositionsMetaSheet.getDataRange().getValues() : [];
+  const selectionsSheet = ss.getSheetByName("Selections");
+  const selections = selectionsSheet ? selectionsSheet.getDataRange().getValues() : [];
 
-  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta });
+  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections });
 }

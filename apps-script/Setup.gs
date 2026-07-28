@@ -24,6 +24,7 @@ function setup() {
   setupOsteoSlots();
   setupOsteoReservations();
   setupCompositions();
+  setupSelections();
   ensureGridAction("Non renseigné avant dimanche soir", 1); // lié à Notifications.gs (checkDisponibilitesDimanche)
 }
 

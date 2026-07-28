@@ -159,14 +159,21 @@ function renderProfilPage() {
     const mesJoueurs = comptes.slice(1).filter(c => rowHasRole(c, "Joueur") && rowEquipesForRole(c, "Joueur").indexOf(chosenCoachTeam) !== -1);
     const showAll = !!window.__profilJoueursExpanded;
     const visible = showAll ? mesJoueurs : mesJoueurs.slice(0, 4);
+    const bruleFor = chosenCoachTeam === "SM1" ? bruleMatchesForSM1 : (chosenCoachTeam === "U17" ? bruleMatchesForU17 : null);
+    const bruleMax = chosenCoachTeam === "SM1" ? BRULAGE_MAX_MATCHES_SM1 : (chosenCoachTeam === "U17" ? BRULAGE_MAX_MATCHES_U17 : 0);
     html += `<div class="card">
       <div class="section-h">Mes joueurs (${mesJoueurs.length})</div>
-      ${mesJoueurs.length === 0 ? `<div class="muted">Aucun joueur trouvé pour cette équipe.</div>` : visible.map(j => `
+      ${mesJoueurs.length === 0 ? `<div class="muted">Aucun joueur trouvé pour cette équipe.</div>` : visible.map(j => {
+        const brule = bruleFor ? bruleFor(j[0]) : null;
+        const bruleColor = brule === null ? "" : (brule >= bruleMax ? "#ff5a5a" : (brule >= bruleMax - 2 ? "#ffb43c" : "#33d17a"));
+        return `
         <div class="mesjoueurs-row">
           <div class="cn-avatar" style="width:32px; height:32px; font-size:11px;">${getInitials(j[0])}</div>
           <div class="mesjoueurs-name">${j[0]}</div>
+          ${brule !== null ? `<span class="badge" style="color:${bruleColor}; border-color:${bruleColor};">${brule}/${bruleMax} en ${chosenCoachTeam}</span>` : ""}
           ${j[3] ? `<span class="badge">${String(j[3]).split(",")[0]}</span>` : ""}
-        </div>`).join("")}
+        </div>`;
+      }).join("")}
       ${mesJoueurs.length > 4 ? `<div class="expand-toggle" data-toggle-profil-joueurs="1">${showAll ? "Réduire ▲" : "Voir les autres ▾"}</div>` : ""}
     </div>`;
   } else {

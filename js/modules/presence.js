@@ -127,14 +127,28 @@ function renderPresencePage() {
   const preferredTeam = equipesForRole("Coach")[0] || primaryEquipe();
   const defaultTeam = switcherTeams.includes(preferredTeam) ? preferredTeam : (switcherTeams[0] || "SM1");
   const activeTeam = (window.__presenceTeamView && switcherTeams.includes(window.__presenceTeamView)) ? window.__presenceTeamView : defaultTeam;
+  const canManage = hasRole("Coach") || hasRole("Admin");
+  const view = (canManage && window.__presenceSubView === "selection") ? "selection" : "presence";
+
+  let html = `<div class="page-title">Présence</div><div class="page-sub">Suivi des présences de l'équipe.</div>`;
+  html += renderTeamSwitcher(switcherTeams, activeTeam, "presence-team");
+
+  if (canManage) {
+    html += `<div class="team-switch-row">
+      <button type="button" class="team-switch-btn ${view === 'presence' ? 'active' : ''}" data-presence-subview="presence">Présence</button>
+      <button type="button" class="team-switch-btn ${view === 'selection' ? 'active' : ''}" data-presence-subview="selection">Sélection</button>
+    </div>`;
+  }
+
+  if (view === "selection") {
+    return html + renderSelectionSection(activeTeam);
+  }
 
   const sorted = sortedEvenements().filter(ev => eventEquipe(ev) === activeTeam);
   const now = new Date();
   const upcoming = sorted.filter(ev => eventDateObj(ev) >= now);
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
 
-  let html = `<div class="page-title">Présence</div><div class="page-sub">Suivi des présences de l'équipe.</div>`;
-  html += renderTeamSwitcher(switcherTeams, activeTeam, "presence-team");
   html += renderAverageCard(activeTeam, false);
   html += renderAverageCard(activeTeam, true);
 
@@ -160,6 +174,92 @@ function renderPresencePage() {
   html += renderPresenceDetailModal();
 
   return html;
+}
+
+// ===================== SÉLECTION MATCH (SM1 en premier lieu) =====================
+// Distinct de la présence : qui est retenu dans les 12 pour le match, pas juste disponible.
+// Réservé Coach/Admin (voir canManage dans renderPresencePage) — feuille "Selections".
+
+function selectionEntryFor(eventId, nom) {
+  return selections.find(r => r[0] === eventId && r[1] === nom) || null;
+}
+
+function selectionCountFor(eventId) {
+  return selections.filter(r => r[0] === eventId && r[2] === "Oui").length;
+}
+
+function renderSelectionSection(activeTeam) {
+  const matches = sortedEvenements().filter(ev => eventEquipe(ev) === activeTeam && typeClass(ev[3]) === "match");
+  const roster = rosterForEquipe(activeTeam);
+  if (matches.length === 0) {
+    return `<div class="card muted">Aucun match enregistré pour cette équipe.</div>`;
+  }
+  let html = "";
+  matches.forEach(ev => { html += renderSelectionEventCard(ev, roster); });
+  return html;
+}
+
+function renderSelectionEventCard(ev, roster) {
+  const [id, , , , titre, lieu] = ev;
+  const d = eventDateObj(ev);
+  const isPast = d < new Date();
+  const expanded = window.__expandedSelectionId === id;
+  const displayTitre = formatMatchDisplay(titre, lieu).label || titre || "Match";
+  const count = selectionCountFor(id);
+  const countColor = count >= SELECTION_MAX_PLAYERS ? "#ff5a5a" : "#33d17a";
+
+  let html = `<div class="ev-card" style="flex-direction:column; align-items:stretch; ${isPast ? 'opacity:0.6;' : ''}">
+    <div style="display:flex; align-items:center; gap:12px; cursor:pointer;" data-toggle-selection="${id}">
+      <div class="ev-date"><div class="ev-day">${d.getDate()}</div><div class="ev-month">${d.toLocaleDateString("fr-FR", { month: "short" })}</div></div>
+      <div class="ev-divider"></div>
+      <div class="ev-info">
+        <div class="ev-header-row">
+          <div class="ev-title-big">${escapeHtml(displayTitre)}</div>
+          <span style="color:${countColor}; font-weight:800; font-size:13px;">${count}/${SELECTION_MAX_PLAYERS}</span>
+        </div>
+        <div class="ev-meta">${d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })}${formatHeure(ev) ? " · " + formatHeure(ev) : ""}</div>
+      </div>
+      <div style="color:#e4e8f2; font-size:16px; flex-shrink:0;">${expanded ? "▲" : "▼"}</div>
+    </div>`;
+
+  if (expanded) {
+    html += `<div style="margin-top:12px; border-top:1px solid #1a2030; padding-top:12px;">`;
+    if (roster.length === 0) {
+      html += `<div class="muted">Aucun joueur enregistré pour cette équipe.</div>`;
+    } else {
+      roster.forEach(p => {
+        const entry = selectionEntryFor(id, p);
+        const selected = entry && entry[2] === "Oui";
+        html += `<div class="pres-card">
+          <div class="pres-card-row">
+            <div class="cn-avatar pres-avatar">${getInitials(p)}</div>
+            <div class="pres-card-name">${p}</div>
+            <button type="button" class="toggle-btn ${selected ? 'present' : ''}" data-toggle-selection-player="${id}|||${p}">${selected ? "Sélectionné" : "Sélectionner"}</button>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+async function setSelectionApi(eventId, nom, selectionne) {
+  const existing = selectionEntryFor(eventId, nom);
+  if (selectionne) {
+    if (existing) existing[2] = selectionne; else selections.push([eventId, nom, selectionne]);
+  } else if (existing) {
+    selections = selections.filter(r => r !== existing);
+  }
+  render();
+  try {
+    const params = new URLSearchParams({ action: "setSelection", eventId, nom, selectionne, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    isOnline = true;
+  } catch (err) { isOnline = false; }
+  render();
 }
 
 function renderPresenceEventCard(ev, isPast, activeTeam) {
@@ -327,6 +427,28 @@ function attachPresenceEvents() {
       window.__seasonAvgExpanded = false;
       window.__monthAvgExpanded = false;
       render();
+    };
+  });
+
+  document.querySelectorAll("[data-presence-subview]").forEach(el => {
+    el.onclick = () => { vibrate(); window.__presenceSubView = el.dataset.presenceSubview; render(); };
+  });
+
+  document.querySelectorAll("[data-toggle-selection]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.toggleSelection;
+      window.__expandedSelectionId = window.__expandedSelectionId === id ? null : id;
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-toggle-selection-player]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      const [eventId, nom] = el.dataset.toggleSelectionPlayer.split("|||");
+      const entry = selectionEntryFor(eventId, nom);
+      const selected = entry && entry[2] === "Oui";
+      setSelectionApi(eventId, nom, selected ? "" : "Oui");
     };
   });
 

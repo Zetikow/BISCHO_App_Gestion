@@ -52,6 +52,21 @@ function compositionIsPublished(matchId) {
   return !!(row && row[1] === "1");
 }
 
+// Brûlage U17 : nombre de matchs U17 où le joueur apparaît dans la composition publiée
+// (mécanisme existant, comme ASHS). Plafond BRULAGE_MAX_MATCHES_U17, voir club-config.js.
+function bruleMatchesForU17(nom) {
+  return evenements.filter(ev => eventEquipe(ev) === "U17" && typeClass(ev[3]) === "match"
+    && compositionIsPublished(ev[0]) && Object.values(compositionSlotsFor(ev[0])).includes(nom)).length;
+}
+
+// Brûlage SM1 : pas de composition publiée pour cette équipe pour l'instant, donc basé sur la
+// Sélection match (feuille "Selections", voir presence.js) plutôt que sur une compo. Plafond
+// BRULAGE_MAX_MATCHES_SM1, voir club-config.js.
+function bruleMatchesForSM1(nom) {
+  return evenements.filter(ev => eventEquipe(ev) === "SM1" && typeClass(ev[3]) === "match")
+    .filter(ev => selections.some(r => r[0] === ev[0] && r[1] === nom && r[2] === "Oui")).length;
+}
+
 // Un joueur qui a répondu Présent mais n'a été retenu sur aucun des 12 postes une fois la
 // composition publiée voit un badge verrouillé "Non sélectionné" à la place du toggle
 // Présent/Absent habituel — voir renderEventCard (agenda.js).

@@ -41,6 +41,15 @@ const PLAYERS = ["Thomas L.","JM B.","Hugo R.","Yann N.","Arnaud H.","Victor S."
 const PAYPAL_ME_USERNAME = "CaisseNoireHBCB";
 const TEAMS = ["SM1", "U17", "SM2"];
 
+// Brûlage : nombre max de matchs avant de ne plus pouvoir redescendre dans l'équipe inférieure.
+// SM1 se base sur la Sélection match (feuille "Selections", pas de composition publiée pour
+// cette équipe) ; U17 se base sur la composition publiée (comme avant), voir composition.js.
+const BRULAGE_MAX_MATCHES_SM1 = 11;
+const BRULAGE_MAX_MATCHES_U17 = 10;
+
+// Nombre de places pour la sélection d'un match (compteur "x/12" affiché sur la carte).
+const SELECTION_MAX_PLAYERS = 12;
+
 // Adresse mail de relance visible sur Profil/Accueil pour permettre aux joueurs de la renseigner.
 const EMAIL_REMINDER_UI_VISIBLE = true;
 
