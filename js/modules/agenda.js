@@ -586,6 +586,18 @@ function renderAgenda() {
   const past = sorted.filter(ev => eventDateObj(ev) < now).reverse();
 
   let staggerIndex = 0;
+
+  // "Passés" en premier mais replié par défaut (clic sur le titre pour dérouler) — évite que
+  // l'historique ne pousse "À venir" hors de l'écran à chaque ouverture de la page.
+  if (past.length > 0) {
+    const pastKey = "agenda_passes_" + activeTeam;
+    const pastOpen = !!(window.__homeCollapsed && window.__homeCollapsed[pastKey]);
+    html += `<div class="section-h" style="cursor:pointer;" data-toggle-home-section="${pastKey}">Passés ${pastOpen ? "▴" : "▾"}</div>`;
+    if (pastOpen) {
+      past.slice(0, 8).forEach(ev => { html += renderEventCard(ev, canManage, true, staggerIndex++); });
+    }
+  }
+
   if (upcoming.length === 0) {
     html += `<div class="section-h">À venir</div><div class="card muted">Aucun événement à venir pour le moment.</div>`;
   } else {
@@ -598,11 +610,6 @@ function renderAgenda() {
       }
       html += renderEventCard(ev, canManage, false, staggerIndex++);
     });
-  }
-
-  if (past.length > 0) {
-    html += `<div class="section-h">Passés</div>`;
-    past.slice(0, 8).forEach(ev => { html += renderEventCard(ev, canManage, true, staggerIndex++); });
   }
 
   if (window.__compositionMatchId) html += renderCompositionEditor(window.__compositionMatchId);

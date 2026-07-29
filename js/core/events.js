@@ -18,7 +18,7 @@ function attachEvents() {
   attachAgendaEvents();
   attachCompositionEvents();
   attachPresenceEvents();
-  attachCovoiturageEvents();
+  attachGestionMatchsEvents();
   attachOsteoEvents();
   attachActualitesEvents();
   attachSalariesEvents();

@@ -25,6 +25,10 @@ function setup() {
   setupOsteoReservations();
   setupCompositions();
   setupSelections();
+  setupGouter();
+  setupTableMarque();
+  setupMaillots();
+  setupFoodtrucks();
   ensureGridAction("Non renseigné avant dimanche soir", 1); // lié à Notifications.gs (checkDisponibilitesDimanche)
 }
 

@@ -399,7 +399,7 @@ const NAV_ICONS = {
   profil: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
   actualites: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M7 14v5a2 2 0 002 2h1"/>',
   salaries: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>',
-  covoiturage: '<path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11M3 11h18v6a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z"/><circle cx="7.5" cy="16.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/>',
+  covoiturage: '<path d="M9 4H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2h-2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h6M9 20h3"/>',
   osteo: '<path d="M5 3v5a3 3 0 003 3 3 3 0 003-3V3"/><path d="M8 11v2a6 6 0 006 6 6 6 0 006-6v-2"/><circle cx="20" cy="7" r="2"/><circle cx="14" cy="21" r="2"/>',
 };
 
@@ -452,7 +452,7 @@ function getTabsForRole() {
   const totalIfAllMain = tabs.length + extraCandidates.length + (hasCovoit ? 1 : 0) + (hasOsteo ? 1 : 0) + 1;
   if (totalIfAllMain <= 6) {
     extraCandidates.forEach(e => tabs.push({ ...e, main: true }));
-    if (hasCovoit) tabs.push({ id: "covoiturage", label: "Covoiturage", main: true });
+    if (hasCovoit) tabs.push({ id: "covoiturage", label: "Gestion Matchs", main: true });
     if (hasOsteo) tabs.push({ id: "osteo", label: "Ostéo", main: true });
     tabs.push({ id: "profil", label: "Profil", main: true });
     return tabs;
@@ -464,7 +464,7 @@ function getTabsForRole() {
   }
 
   const extra = extraCandidates.slice();
-  if (hasCovoit) extra.push({ id: "covoiturage", label: "Covoiturage", main: false });
+  if (hasCovoit) extra.push({ id: "covoiturage", label: "Gestion Matchs", main: false });
   if (hasOsteo) extra.push({ id: "osteo", label: "Ostéo", main: false });
 
   // Un seul élément dans "Plus" -> inutile de le cacher derrière un clic, on l'affiche directement.
@@ -567,7 +567,7 @@ function render() {
   else if (currentPage === "profil") html += renderProfilPage();
   else if (currentPage === "actualites") html += renderActualitesPage();
   else if (currentPage === "salaries") html += renderSalariesPage();
-  else if (currentPage === "covoiturage") html += renderCovoiturageePage();
+  else if (currentPage === "covoiturage") html += renderGestionMatchsPage();
   else if (currentPage === "gallery") html += renderGalleryPage();
   else if (currentPage === "photoview") html += renderPhotoViewPage();
   else if (currentPage === "guide") html += renderGuidePage();

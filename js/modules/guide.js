@@ -51,10 +51,11 @@ function guideSections() {
       "Accessible depuis le bouton 📷 sur la carte des résultats de l'Accueil.",
       "Les photos sont ajoutées par l'Admin ou le Salarié directement sur Google Drive.",
     ]},
-    { title: "Covoiturage", items: [
-      "Visible pour les matchs à l'extérieur uniquement.",
-      "Indique si tu conduis (avec le nombre de places) ou si tu cherches une place.",
-      "Pour les équipes de mineurs, le joueur ET son parent peuvent tous les deux le renseigner.",
+    { title: "Gestion Matchs", items: [
+      "Covoiturage : visible pour les matchs à l'extérieur uniquement — indique si tu conduis (avec le nombre de places) ou si tu cherches une place. Pour les équipes de mineurs, le joueur ET son parent peuvent tous les deux le renseigner.",
+      "Goûter et Table de marque : inscriptions bénévoles pour la préparation, match par match.",
+      "Maillots : suivi de qui a le jeu de maillots pour chaque match.",
+      "Foodtrucks (Coach/Admin/Salarié) : suivi des foodtrucks sur les matchs à domicile.",
     ]},
     { title: "RDV Ostéo", items: [
       "Onglet \"Disponibles\" : réserve un créneau libre pour ton équipe (ou ouvert à tous), avec un motif optionnel visible seulement par toi et Eve.",
