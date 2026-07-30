@@ -122,40 +122,43 @@ function computePresenceDetail(p, equipe, monthOnly) {
   return { absences: absences.sort(byDateAsc), presences: presences.sort(byDateAsc) };
 }
 
-function renderPresenceDetailEvRow(ev) {
+function renderPresenceDetailEvRow(ev, present) {
   const d = eventDateObj(ev);
   const dateLabel = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
   const titre = typeClass(ev[3]) === "match" ? formatMatchDisplay(ev[4], ev[5]).label : (ev[4] || ev[3] || "Événement");
-  return `<div class="presence-detail-ev">
-    <span class="presence-detail-ev-date">${dateLabel}</span>
-    <span class="presence-detail-ev-title">${escapeHtml(titre)}</span>
+  const color = present ? "#33d17a" : "#ff5a5a";
+  return `<div class="sheet-row">
+    <div class="ic" style="background:${present ? "rgba(51,209,122,0.14)" : "rgba(255,90,90,0.14)"};"><svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2">${present ? '<path d="M20 6L9 17l-5-5"/>' : '<path d="M6 6l12 12M18 6L6 18"/>'}</svg></div>
+    <div><b>${escapeHtml(titre)}</b><span>${dateLabel}</span></div>
   </div>`;
 }
 
-// Petite fenêtre (pas une page dédiée) ouverte au clic sur une ligne de moyenne de présence :
+// Fiche (bottom sheet, voir css .sheet-*) ouverte au clic sur une ligne de moyenne de présence :
 // liste les entraînements/matchs où le joueur a été marqué absent, puis présent, sur la même
-// période que la ligne cliquée. Fermeture via la croix ou un clic hors de la fenêtre ; bouton
-// "agrandir" pour passer en plein cadre (utile sur les périodes avec beaucoup d'événements).
+// période que la ligne cliquée. Fermeture via la croix ou un clic hors de la fiche.
 function renderPresenceDetailModal() {
   const ctx = window.__presenceDetailFor;
   if (!ctx) return "";
   const { p, equipe, monthOnly } = ctx;
   const { absences, presences } = computePresenceDetail(p, equipe, monthOnly);
-  const expanded = !!window.__presenceDetailExpanded;
   const periodLabel = monthOnly ? new Date().toLocaleDateString("fr-FR", { month: "long" }) : "la saison";
+  const total = absences.length + presences.length;
+  const pct = total > 0 ? Math.round((presences.length / total) * 100) : null;
 
-  return `<div class="presence-detail-overlay" data-presence-detail-close-bg="1">
-    <div class="presence-detail-sheet ${expanded ? "expanded" : ""}">
-      <div class="presence-detail-header">
-        <div class="presence-detail-title">${escapeHtml(p)} — ${periodLabel}</div>
-        <div class="presence-detail-expand" id="presence-detail-expand-toggle" title="${expanded ? "Réduire" : "Agrandir"}">${expanded ? "⤡" : "⤢"}</div>
-        <div class="modal-close" id="presence-detail-close">✕</div>
+  return `<div class="sheet-overlay open" data-close-sheet="presenceDetailFor">
+    <div class="sheet-scrim" data-close-sheet="presenceDetailFor"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="presenceDetailFor">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">${escapeHtml(equipe)} · ${periodLabel}</div>
+        <h2>${escapeHtml(p)}</h2>
+        <p>${pct !== null ? `${pct}% de présence · ${presences.length} présence${presences.length > 1 ? "s" : ""} / ${total} réponse${total > 1 ? "s" : ""}` : "Pas encore de données"}</p>
       </div>
-      <div class="presence-detail-body">
-        <div class="section-h" style="margin-top:0;">Absences (${absences.length})</div>
-        ${absences.length === 0 ? `<div class="muted" style="margin-bottom:14px;">Aucune absence.</div>` : `<div style="margin-bottom:14px;">${absences.map(renderPresenceDetailEvRow).join("")}</div>`}
-        <div class="section-h">Présences (${presences.length})</div>
-        ${presences.length === 0 ? `<div class="muted">Aucune présence enregistrée.</div>` : presences.map(renderPresenceDetailEvRow).join("")}
+      <div class="sheet-body">
+        ${total === 0 ? `<div class="muted">Aucune réponse enregistrée sur cette période.</div>` : ""}
+        ${absences.length > 0 ? absences.map(ev => renderPresenceDetailEvRow(ev, false)).join("") : ""}
+        ${presences.length > 0 ? presences.map(ev => renderPresenceDetailEvRow(ev, true)).join("") : ""}
       </div>
     </div>
   </div>`;
@@ -509,22 +512,9 @@ function attachPresenceEvents() {
         equipe: el.dataset.presenceDetailEquipe,
         monthOnly: el.dataset.presenceDetailMonth === "1",
       };
-      window.__presenceDetailExpanded = false;
       render();
     };
   });
-
-  const presenceDetailBg = document.querySelector("[data-presence-detail-close-bg]");
-  if (presenceDetailBg) presenceDetailBg.onclick = (e) => {
-    if (e.target === presenceDetailBg) { window.__presenceDetailFor = null; render(); }
-  };
-
-  const presenceDetailClose = document.getElementById("presence-detail-close");
-  if (presenceDetailClose) presenceDetailClose.onclick = () => { window.__presenceDetailFor = null; render(); };
-
-  const presenceDetailExpandToggle = document.getElementById("presence-detail-expand-toggle");
-  if (presenceDetailExpandToggle) presenceDetailExpandToggle.onclick = () => {
-    window.__presenceDetailExpanded = !window.__presenceDetailExpanded;
-    render();
-  };
+  // Fermeture (croix, clic hors de la fiche) : voir data-close-sheet, câblé une seule fois
+  // pour toutes les fiches de l'appli dans core/events.js.
 }

@@ -518,10 +518,10 @@ function renderEventDetailSheet() {
     else if (v === "Non") absentCount++;
   });
 
-  let html = `<div class="sheet-overlay open" data-close-sheet="1">
-    <div class="sheet-scrim" data-close-sheet="1"></div>
+  let html = `<div class="sheet-overlay open" data-close-sheet="eventDetailId">
+    <div class="sheet-scrim" data-close-sheet="eventDetailId"></div>
     <div class="sheet">
-      <div class="sheet-close" data-close-sheet="1">✕</div>
+      <div class="sheet-close" data-close-sheet="eventDetailId">✕</div>
       <div class="sheet-grab"></div>
       <div class="sheet-hero">
         <div class="sheet-hero-eyebrow">${escapeHtml(type || "Événement")}${equipe && equipe !== "Toutes" ? " · " + escapeHtml(teamDisplayLabel(equipe)) : ""}</div>
@@ -901,14 +901,6 @@ function attachAgendaEvents() {
     el.onclick = () => {
       vibrate();
       window.__eventDetailId = el.dataset.openEventDetail;
-      render();
-    };
-  });
-
-  document.querySelectorAll("[data-close-sheet]").forEach(el => {
-    el.onclick = (e) => {
-      if (e.target !== e.currentTarget) return; // ne ferme pas si on clique dans la fiche elle-même
-      window.__eventDetailId = null;
       render();
     };
   });
