@@ -56,6 +56,9 @@ function gestionMatchsSectionsSorted() {
     .map(x => x.s);
 }
 
+function covoitEntryFor(eventId, nom) {
+  return covoiturage.find(r => r[0] === eventId && r[1] === nom) || null;
+}
 function gouterEntryFor(eventId, nom) {
   return gouter.find(r => r[0] === eventId && r[1] === nom) || null;
 }
@@ -68,6 +71,17 @@ function maillotsEntryFor(eventId, nom) {
 // Nombre de fois où cette personne a pris les maillots sur la saison.
 function maillotsCountFor(nom) {
   return maillots.filter(r => r[1] === nom && r[2] === "Oui").length;
+}
+
+async function setCovoiturageApi(nom, eventId, jeConduit, places, besoinPlace) {
+  const existing = covoitEntryFor(eventId, nom);
+  if (existing) { existing[2] = jeConduit; existing[3] = places; existing[4] = besoinPlace; }
+  else covoiturage.push([eventId, nom, jeConduit, places, besoinPlace]);
+  render();
+  try {
+    const params = new URLSearchParams({ action: "setCovoiturage", nom, eventId, jeConduit, places, besoinPlace, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+  } catch (err) { isOnline = false; render(); }
 }
 
 async function setGouterApi(nom, eventId, quoi) {
