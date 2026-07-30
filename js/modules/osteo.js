@@ -45,7 +45,53 @@ function renderOsteoPage() {
     html += renderOsteoManagerView();
   }
 
+  html += renderAddOsteoSlotSheet();
+
   return html;
+}
+
+// ===================== FICHE NOUVEAU CRÉNEAU (bottom sheet) =====================
+function renderAddOsteoSlotSheet() {
+  if (!window.__showAddOsteoSlot) return "";
+  const recurrent = !!window.__osteoSlotRecurrent;
+  const bodyHtml = `
+    <label class="field-label">Équipe concernée</label>
+    <select id="osteo-slot-equipe">
+      ${TEAMS.map(t => `<option value="${t}">${teamDisplayLabel(t)}</option>`).join("")}
+      <option value="Toutes">Toutes</option>
+    </select>
+    <label class="field-label">Date</label>
+    ${dateSelectHtml("osteo-slot-date", "")}
+    <label class="field-label">Heure</label>
+    ${heureSelectHtml("osteo-slot-heure", "")}
+    <label class="field-label">Lieu</label>
+    <input id="osteo-slot-lieu" type="text" placeholder="Ex: ${DEFAULT_VENUE_NAME}" value="${DEFAULT_VENUE_NAME}" />
+    <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#e4e8f2; font-weight:700; margin-top:10px;">
+      <input type="checkbox" id="osteo-slot-recurrent" ${recurrent ? "checked" : ""} style="width:16px; height:16px;"/> Créneau récurrent (chaque semaine)
+    </label>
+    ${recurrent ? `<label class="field-label" style="margin-top:8px;">Nombre de semaines</label>
+    <select id="osteo-slot-weeks">
+      <option value="4">4 semaines</option>
+      <option value="8" selected>8 semaines</option>
+      <option value="12">12 semaines</option>
+    </select>` : ""}
+    <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#e4e8f2; font-weight:700; margin-top:10px;">
+      <input type="checkbox" id="osteo-slot-actu" checked style="width:16px; height:16px;"/> Publier une actualité pour l'annoncer
+    </label>
+    <button class="btn" id="osteo-slot-submit" style="margin-top:12px;">Créer le créneau</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddOsteoSlot">
+    <div class="sheet-scrim" data-close-sheet="showAddOsteoSlot"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddOsteoSlot">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">RDV Ostéo</div>
+        <h2>Nouveau créneau</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 function osteoSlotDate(slot) {
@@ -135,36 +181,7 @@ function renderOsteoPlayerView(tab) {
 function renderOsteoManagerView() {
   let html = "";
 
-  html += `<button class="btn add-btn-primary" id="toggle-add-osteo-slot">${window.__showAddOsteoSlot ? "− Fermer" : "+ Nouveau créneau"}</button>`;
-  if (window.__showAddOsteoSlot) {
-    const recurrent = !!window.__osteoSlotRecurrent;
-    html += `<div class="add-form">
-      <label class="field-label">Équipe concernée</label>
-      <select id="osteo-slot-equipe">
-        ${TEAMS.map(t => `<option value="${t}">${teamDisplayLabel(t)}</option>`).join("")}
-        <option value="Toutes">Toutes</option>
-      </select>
-      <label class="field-label">Date</label>
-      ${dateSelectHtml("osteo-slot-date", "")}
-      <label class="field-label">Heure</label>
-      ${heureSelectHtml("osteo-slot-heure", "")}
-      <label class="field-label">Lieu</label>
-      <input id="osteo-slot-lieu" type="text" placeholder="Ex: ${DEFAULT_VENUE_NAME}" value="${DEFAULT_VENUE_NAME}" />
-      <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#e4e8f2; font-weight:700; margin-top:10px;">
-        <input type="checkbox" id="osteo-slot-recurrent" ${recurrent ? "checked" : ""} style="width:16px; height:16px;"/> Créneau récurrent (chaque semaine)
-      </label>
-      ${recurrent ? `<label class="field-label" style="margin-top:8px;">Nombre de semaines</label>
-      <select id="osteo-slot-weeks">
-        <option value="4">4 semaines</option>
-        <option value="8" selected>8 semaines</option>
-        <option value="12">12 semaines</option>
-      </select>` : ""}
-      <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#e4e8f2; font-weight:700; margin-top:10px;">
-        <input type="checkbox" id="osteo-slot-actu" checked style="width:16px; height:16px;"/> Publier une actualité pour l'annoncer
-      </label>
-      <button class="btn" id="osteo-slot-submit" style="margin-top:10px;">Créer le créneau</button>
-    </div>`;
-  }
+  html += `<button class="btn add-btn-primary" id="toggle-add-osteo-slot">+ Nouveau créneau</button>`;
 
   const now = new Date();
   const upcoming = osteoSlots.filter(s => osteoSlotDate(s) >= now).sort((a, b) => osteoSlotDate(a) - osteoSlotDate(b));

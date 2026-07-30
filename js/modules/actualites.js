@@ -30,20 +30,7 @@ function renderActualitesPage() {
   let html = `<div class="page-title">Actualités</div><div class="page-sub">Annonces du club et des équipes.</div>`;
 
   if (canCreate) {
-    html += `<button class="btn add-btn-primary" id="toggle-add-actualite">${window.__showAddActualite ? "− Fermer" : "+ Ajouter une actualité"}</button>`;
-    if (window.__showAddActualite) {
-      html += `<div class="add-form">
-        <label class="field-label">Titre</label>
-        <input id="actu-titre" type="text" placeholder="ex: Photo d'équipe le 11 octobre" />
-        <label class="field-label">Pour qui</label>
-        <select id="actu-scope">
-          ${creatableScopes.map(s => `<option value="${s}">${s === "Générale" ? "Actualité générale" : `Actualité ${s}`}</option>`).join("")}
-        </select>
-        <label class="field-label">Texte</label>
-        <textarea id="actu-texte" rows="4" placeholder="Détails de l'actualité..." style="width:100%; background:#11141f; border:1px solid #2a3350; border-radius:9px; padding:10px; color:#e8e8ee; font-family:'DM Sans',sans-serif; font-size:13px; resize:vertical;"></textarea>
-        <button class="btn" id="submit-add-actualite" style="margin-top:8px;">Publier l'actualité</button>
-      </div>`;
-    }
+    html += `<button class="btn add-btn-primary" id="toggle-add-actualite">+ Ajouter une actualité</button>`;
   }
 
   const filterOptions = actuFilterOptions();
@@ -76,7 +63,37 @@ function renderActualitesPage() {
     });
   }
 
+  html += renderAddActualiteSheet(creatableScopes);
+
   return html;
+}
+
+// ===================== FICHE AJOUT ACTUALITÉ (bottom sheet) =====================
+function renderAddActualiteSheet(creatableScopes) {
+  if (!window.__showAddActualite) return "";
+  const bodyHtml = `
+    <label class="field-label">Titre</label>
+    <input id="actu-titre" type="text" placeholder="ex: Photo d'équipe le 11 octobre" />
+    <label class="field-label">Pour qui</label>
+    <select id="actu-scope">
+      ${creatableScopes.map(s => `<option value="${s}">${s === "Générale" ? "Actualité générale" : `Actualité ${s}`}</option>`).join("")}
+    </select>
+    <label class="field-label">Texte</label>
+    <textarea id="actu-texte" rows="4" placeholder="Détails de l'actualité..." style="width:100%; background:#11141f; border:1px solid #2a3350; border-radius:9px; padding:10px; color:#e8e8ee; font-family:'DM Sans',sans-serif; font-size:13px; resize:vertical;"></textarea>
+    <button class="btn" id="submit-add-actualite" style="margin-top:12px;">Publier l'actualité</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddActualite">
+    <div class="sheet-scrim" data-close-sheet="showAddActualite"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddActualite">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Actualités</div>
+        <h2>Ajouter une actualité</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 // ===================== ACTIONS API =====================

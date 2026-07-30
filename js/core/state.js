@@ -8,7 +8,7 @@ const LOGO_DATA_URI = "images/icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-31-4"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-31-5"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -102,7 +102,6 @@ let loginNeedsSetup = null; // null = pas encore vérifié, true/false ensuite
 let loginSelectedNom = localStorage.getItem(LAST_USER_KEY) || "";
 let loginPrefilledFromMemory = !!loginSelectedNom;
 let loginNoms = null; // [{nom, role}, ...] chargé avant connexion, remplace la liste figée PLAYERS pour le menu
-let showAddEvent = false;
 
 // ---------- Données ----------
 
@@ -159,7 +158,7 @@ function parsePresenceEvenements(rows) {
 // l'appli "bloquait" après une création de créneau, sans erreur : il fallait recharger pour
 // voir le résultat).
 function isFormOpen() {
-  return !!window.__compositionDragActive || !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined) || !!window.__showAddActualite || !!window.__cnEditPlayer || !!window.__showSalariesAdd || !!window.__salariesPreviewFile || !!window.__salariesUploading || !!window.__profilEmailEditing || currentPage === "support" || !!window.__showAddOsteoSlot || !!window.__osteoReassignId || !!window.__osteoReserveSlotId;
+  return !!window.__compositionDragActive || !!window.__showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined) || !!window.__showAddActualite || !!window.__cnEditPlayer || !!window.__showSalariesAdd || !!window.__salariesPreviewFile || !!window.__salariesUploading || !!window.__profilEmailEditing || currentPage === "support" || !!window.__showAddOsteoSlot || !!window.__osteoReassignId || !!window.__osteoReserveSlotId;
 }
 
 // Détection générique (pas de liste à maintenir à la main comme isFormOpen ci-dessus) : si le

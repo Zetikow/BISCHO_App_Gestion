@@ -622,42 +622,7 @@ function renderAgenda() {
   let html = `<div class="page-title">Agenda</div><div class="page-sub">Matchs, entraînements et événements ${equipeLabel}.</div>`;
 
   if (canManage) {
-    html += `<button class="btn add-btn-primary" id="toggle-add-event">${showAddEvent ? "− Fermer" : "+ Ajouter un événement"}</button>`;
-    if (showAddEvent) {
-      const effectiveType = window.__addEventType || (isSalarie ? "Repas" : "Match");
-      const isMatchType = effectiveType === "Match";
-      html += `<div class="add-form">
-        <label class="field-label">Date</label>
-        ${dateSelectHtml("ev-date", "")}
-        <label class="field-label">Heure</label>
-        ${heureSelectHtml("ev-heure", "")}
-        <label class="field-label">Type</label>
-        <select id="ev-type">
-          ${isSalarie ? "" : `<option value="Match" ${effectiveType === "Match" ? "selected" : ""}>Match</option><option value="Entraînement" ${effectiveType === "Entraînement" ? "selected" : ""}>Entraînement</option>`}
-          <option value="Repas" ${effectiveType === "Repas" ? "selected" : ""}>Repas</option>
-          <option value="Soirée" ${effectiveType === "Soirée" ? "selected" : ""}>Soirée</option>
-          <option value="Bénévole" ${effectiveType === "Bénévole" ? "selected" : ""}>Bénévole</option>
-          <option value="Autre" ${effectiveType === "Autre" ? "selected" : ""}>Autre</option>
-        </select>
-        ${isMatchType ? `
-        <label class="field-label">Équipe 1</label>
-        <input type="text" value="${CLUB_TEAM_NAME}" disabled style="opacity:0.6;" />
-        <label class="field-label">Adversaire</label>
-        <input id="ev-adversaire" type="text" placeholder="ex: Illkirch" />
-        ` : `
-        <label class="field-label">Titre</label>
-        <input id="ev-titre" type="text" placeholder="ex: Repas d'équipe" />
-        `}
-        <label class="field-label">Lieu</label>
-        <input id="ev-lieu" type="text" value="${DEFAULT_VENUE_NAME}" />
-        ${(hasRole("Admin")) ? `<label class="field-label">Équipe</label>
-        <select id="ev-equipe">
-          ${TEAMS.map(t => `<option value="${t}" ${activeTeam === t ? "selected" : ""}>${teamDisplayLabel(t)}</option>`).join("")}
-          <option value="Toutes" ${activeTeam === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
-        </select>` : ""}
-        <button class="btn" id="submit-add-event" style="margin-top:4px;">Enregistrer l'événement</button>
-      </div>`;
-    }
+    html += `<button class="btn add-btn-primary" id="toggle-add-event">+ Ajouter un événement</button>`;
   }
 
   html += renderTeamSwitcher(switcherTeams, activeTeam, "agenda-team");
@@ -704,7 +669,64 @@ function renderAgenda() {
   if (window.__compositionMatchId) html += renderCompositionEditor(window.__compositionMatchId);
   if (window.__compositionViewMatchId) html += renderCompositionPlayerView(window.__compositionViewMatchId);
 
+  html += renderAddEventSheet();
+
   return html;
+}
+
+// ===================== FICHE AJOUT ÉVÉNEMENT (bottom sheet) =====================
+function renderAddEventSheet() {
+  if (!window.__showAddEvent) return "";
+  const isSalarie = hasRole("Salarié") && !hasRole("Joueur") && !hasRole("Coach") && !hasRole("Admin");
+  const switcherTeams = isSalarie ? [] : equipesForSwitcher();
+  const defaultTeam = isSalarie ? "Toutes" : (hasRole("Admin") ? (switcherTeams[0] || "SM1") : (primaryEquipe()));
+  const activeTeam = isSalarie ? "Toutes" : ((window.__agendaTeamView && switcherTeams.includes(window.__agendaTeamView)) ? window.__agendaTeamView : defaultTeam);
+  const effectiveType = window.__addEventType || (isSalarie ? "Repas" : "Match");
+  const isMatchType = effectiveType === "Match";
+
+  const bodyHtml = `
+    <label class="field-label">Date</label>
+    ${dateSelectHtml("ev-date", "")}
+    <label class="field-label">Heure</label>
+    ${heureSelectHtml("ev-heure", "")}
+    <label class="field-label">Type</label>
+    <select id="ev-type">
+      ${isSalarie ? "" : `<option value="Match" ${effectiveType === "Match" ? "selected" : ""}>Match</option><option value="Entraînement" ${effectiveType === "Entraînement" ? "selected" : ""}>Entraînement</option>`}
+      <option value="Repas" ${effectiveType === "Repas" ? "selected" : ""}>Repas</option>
+      <option value="Soirée" ${effectiveType === "Soirée" ? "selected" : ""}>Soirée</option>
+      <option value="Bénévole" ${effectiveType === "Bénévole" ? "selected" : ""}>Bénévole</option>
+      <option value="Autre" ${effectiveType === "Autre" ? "selected" : ""}>Autre</option>
+    </select>
+    ${isMatchType ? `
+    <label class="field-label">Équipe 1</label>
+    <input type="text" value="${CLUB_TEAM_NAME}" disabled style="opacity:0.6;" />
+    <label class="field-label">Adversaire</label>
+    <input id="ev-adversaire" type="text" placeholder="ex: Illkirch" />
+    ` : `
+    <label class="field-label">Titre</label>
+    <input id="ev-titre" type="text" placeholder="ex: Repas d'équipe" />
+    `}
+    <label class="field-label">Lieu</label>
+    <input id="ev-lieu" type="text" value="${DEFAULT_VENUE_NAME}" />
+    ${(hasRole("Admin")) ? `<label class="field-label">Équipe</label>
+    <select id="ev-equipe">
+      ${TEAMS.map(t => `<option value="${t}" ${activeTeam === t ? "selected" : ""}>${teamDisplayLabel(t)}</option>`).join("")}
+      <option value="Toutes" ${activeTeam === "Toutes" ? "selected" : ""}>Toutes (club entier)</option>
+    </select>` : ""}
+    <button class="btn" id="submit-add-event" style="margin-top:12px;">Enregistrer l'événement</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddEvent">
+    <div class="sheet-scrim" data-close-sheet="showAddEvent"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddEvent">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Agenda</div>
+        <h2>Ajouter un événement</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 function renderJustifBlock(eventId) {
@@ -840,7 +862,7 @@ async function addEvenementApi(date, heure, type, titre, lieu, equipe) {
   const finalEquipe = equipe || primaryEquipe();
   const tempId = "temp_" + Date.now();
   evenements.push([tempId, date, heure, type, titre, lieu, finalEquipe, ""]);
-  showAddEvent = false;
+  window.__showAddEvent = false;
   render();
   try {
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=addEvenement&date=${encodeURIComponent(date)}&heure=${encodeURIComponent(heure)}&type=${encodeURIComponent(type)}&titre=${encodeURIComponent(titre)}&lieu=${encodeURIComponent(lieu)}&equipe=${encodeURIComponent(finalEquipe)}&authNom=${encodeURIComponent(session.nom)}&authCode=${encodeURIComponent(session.code)}`);
@@ -993,7 +1015,8 @@ function attachAgendaEvents() {
 
   const toggleAddEvent = document.getElementById("toggle-add-event");
   if (toggleAddEvent) toggleAddEvent.onclick = () => {
-    showAddEvent = !showAddEvent;
+    vibrate();
+    window.__showAddEvent = true;
     window.__addEventType = null;
     render();
   };

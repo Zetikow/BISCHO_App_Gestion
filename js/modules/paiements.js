@@ -40,20 +40,7 @@ function renderPaiementsPage() {
     <div class="pay-summary-sub">Sur ${fmt(totalDu)} € dus · ${fmt(totalPayeAll)} € reçus</div>
   </div>`;
 
-  html += `<button class="btn add-btn-primary" id="toggle-add-paiement">${window.__showAddPaiement ? "− Fermer" : "+ Ajouter un paiement"}</button>`;
-  if (window.__showAddPaiement) {
-    html += `<div class="add-form">
-      <label class="field-label">Joueur</label>
-      <select id="paiement-joueur">
-        ${PLAYERS.map(p => `<option value="${p}">${p}</option>`).join("")}
-      </select>
-      <label class="field-label">Montant (€)</label>
-      <input id="paiement-montant" type="number" step="0.5" placeholder="Ex: 20" />
-      <label class="field-label">Commentaire (optionnel)</label>
-      <input id="paiement-commentaire" type="text" placeholder="Ex: virement, espèces..." />
-      <button class="btn" id="paiement-add" style="margin-top:6px;">Enregistrer le paiement</button>
-    </div>`;
-  }
+  html += `<button class="btn add-btn-primary" id="toggle-add-paiement">+ Ajouter un paiement</button>`;
 
   html += `<div class="section-h">Reste à payer</div>`;
   const resteSorted = PLAYERS.slice().sort((a, b) => resteAPayer(b) - resteAPayer(a));
@@ -115,7 +102,37 @@ function renderPaiementsPage() {
     html += `</div>`;
   }
 
+  html += renderAddPaiementSheet();
+
   return html;
+}
+
+// ===================== FICHE AJOUT PAIEMENT (bottom sheet) =====================
+function renderAddPaiementSheet() {
+  if (!window.__showAddPaiement) return "";
+  const bodyHtml = `
+    <label class="field-label">Joueur</label>
+    <select id="paiement-joueur">
+      ${PLAYERS.map(p => `<option value="${p}">${p}</option>`).join("")}
+    </select>
+    <label class="field-label">Montant (€)</label>
+    <input id="paiement-montant" type="number" step="0.5" placeholder="Ex: 20" />
+    <label class="field-label">Commentaire (optionnel)</label>
+    <input id="paiement-commentaire" type="text" placeholder="Ex: virement, espèces..." />
+    <button class="btn" id="paiement-add" style="margin-top:12px;">Enregistrer le paiement</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddPaiement">
+    <div class="sheet-scrim" data-close-sheet="showAddPaiement"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddPaiement">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Paiements</div>
+        <h2>Ajouter un paiement</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 // ===================== ACTIONS API =====================

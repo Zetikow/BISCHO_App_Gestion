@@ -36,35 +36,7 @@ function renderSalariesPage() {
   const currentFolderId = salariesState.currentFolder ? salariesState.currentFolder.id : null;
 
   if (canManage) {
-    html += `<button class="btn add-btn-primary" id="toggle-add-salaries">${window.__showSalariesAdd ? "− Fermer" : "+ Ajouter"}</button>`;
-    if (window.__showSalariesAdd) {
-      const type = window.__salariesAddType || "dossier";
-      html += `<div class="add-form">
-        <div class="salaries-type-row">
-          <button type="button" class="salaries-type-btn ${type === 'dossier' ? 'active' : ''}" data-salaries-add-type="dossier">Dossier</button>
-          <button type="button" class="salaries-type-btn ${type === 'fichier' ? 'active' : ''}" data-salaries-add-type="fichier">Uploader</button>
-          <button type="button" class="salaries-type-btn ${type === 'lien' ? 'active' : ''}" data-salaries-add-type="lien">Lien externe</button>
-        </div>
-        ${type === 'dossier' ? `
-          <label class="field-label">Nom du dossier</label>
-          <input id="salaries-folder-name" type="text" placeholder="ex: Communication" />
-          <button class="btn" id="submit-salaries-folder" style="margin-top:8px;">Créer le dossier</button>
-        ` : ""}
-        ${type === 'fichier' ? `
-          <label class="field-label">Fichier (image ou document)</label>
-          <input id="salaries-file-input" type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" style="width:100%; color:#e4e8f2; font-size:11px;" />
-          <div class="profil-photo-note" style="text-align:left; margin-top:8px;">Vidéos et gros fichiers : dépose-les directement dans ce dossier depuis l'appli Google Drive — ils apparaîtront ici automatiquement.</div>
-          <button class="btn" id="submit-salaries-file" style="margin-top:8px;" ${window.__salariesUploading ? "disabled" : ""}>${window.__salariesUploading ? (window.__salariesUploadStage || "Envoi en cours...") : "Envoyer"}</button>
-        ` : ""}
-        ${type === 'lien' ? `
-          <label class="field-label">Titre</label>
-          <input id="salaries-link-titre" type="text" placeholder="ex: Planning partagé" />
-          <label class="field-label">Lien (URL)</label>
-          <input id="salaries-link-url" type="text" placeholder="https://..." />
-          <button class="btn" id="submit-salaries-link" style="margin-top:8px;">Ajouter le lien</button>
-        ` : ""}
-      </div>`;
-    }
+    html += `<button class="btn add-btn-primary" id="toggle-add-salaries">+ Ajouter</button>`;
   }
 
   html += `<div class="breadcrumb">${salariesState.breadcrumb.map((b, i) => {
@@ -127,7 +99,52 @@ function renderSalariesPage() {
     </div>`;
   }
 
+  html += renderAddSalariesSheet();
+
   return html;
+}
+
+// ===================== FICHE AJOUT (bottom sheet) =====================
+function renderAddSalariesSheet() {
+  if (!window.__showSalariesAdd) return "";
+  const type = window.__salariesAddType || "dossier";
+  const bodyHtml = `
+    <div class="salaries-type-row">
+      <button type="button" class="salaries-type-btn ${type === 'dossier' ? 'active' : ''}" data-salaries-add-type="dossier">Dossier</button>
+      <button type="button" class="salaries-type-btn ${type === 'fichier' ? 'active' : ''}" data-salaries-add-type="fichier">Uploader</button>
+      <button type="button" class="salaries-type-btn ${type === 'lien' ? 'active' : ''}" data-salaries-add-type="lien">Lien externe</button>
+    </div>
+    ${type === 'dossier' ? `
+      <label class="field-label">Nom du dossier</label>
+      <input id="salaries-folder-name" type="text" placeholder="ex: Communication" />
+      <button class="btn" id="submit-salaries-folder" style="margin-top:8px;">Créer le dossier</button>
+    ` : ""}
+    ${type === 'fichier' ? `
+      <label class="field-label">Fichier (image ou document)</label>
+      <input id="salaries-file-input" type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" style="width:100%; color:#e4e8f2; font-size:11px;" />
+      <div class="profil-photo-note" style="text-align:left; margin-top:8px;">Vidéos et gros fichiers : dépose-les directement dans ce dossier depuis l'appli Google Drive — ils apparaîtront ici automatiquement.</div>
+      <button class="btn" id="submit-salaries-file" style="margin-top:8px;" ${window.__salariesUploading ? "disabled" : ""}>${window.__salariesUploading ? (window.__salariesUploadStage || "Envoi en cours...") : "Envoyer"}</button>
+    ` : ""}
+    ${type === 'lien' ? `
+      <label class="field-label">Titre</label>
+      <input id="salaries-link-titre" type="text" placeholder="ex: Planning partagé" />
+      <label class="field-label">Lien (URL)</label>
+      <input id="salaries-link-url" type="text" placeholder="https://..." />
+      <button class="btn" id="submit-salaries-link" style="margin-top:8px;">Ajouter le lien</button>
+    ` : ""}`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showSalariesAdd">
+    <div class="sheet-scrim" data-close-sheet="showSalariesAdd"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showSalariesAdd">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Espace salariés</div>
+        <h2>Ajouter</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 // ===================== ACTIONS API =====================

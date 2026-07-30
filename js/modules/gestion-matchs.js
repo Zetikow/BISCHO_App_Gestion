@@ -368,28 +368,7 @@ function renderFoodtruckSection() {
     <div class="pay-summary-val">${fmt(total)} €</div>
   </div>`;
 
-  html += `<button class="btn add-btn-primary" id="toggle-add-foodtruck">${window.__showAddFoodtruck ? "− Fermer" : "+ Ajouter un passage foodtruck"}</button>`;
-  if (window.__showAddFoodtruck) {
-    if (matches.length === 0) {
-      html += `<div class="card muted">Aucun match à domicile enregistré pour l'instant.</div>`;
-    } else {
-      html += `<div class="add-form">
-        <label class="field-label">Nom du foodtruck</label>
-        <input id="foodtruck-nom" type="text" placeholder="Ex: Chez Mario — Pizza" />
-        <label class="field-label">Match associé</label>
-        <select id="foodtruck-event">
-          ${matches.map(ev => `<option value="${escapeHtml(ev[0])}">${eventDateObj(ev).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} — ${escapeHtml(eventEquipe(ev))} — ${escapeHtml(formatMatchDisplay(ev[4], ev[5]).label || ev[4] || "Match")}</option>`).join("")}
-        </select>
-        <label class="field-label">Prix / menu</label>
-        <input id="foodtruck-prix" type="text" placeholder="Ex: 8€ la part" />
-        <label class="field-label">Bénéfice pour le club (€)</label>
-        <input id="foodtruck-benefice" type="number" step="0.5" placeholder="Ex: 85" />
-        <label class="field-label">Notes (optionnel)</label>
-        <input id="foodtruck-notes" type="text" placeholder="Ex: bien venu, prévoir 2 emplacements..." />
-        <button class="btn" id="foodtruck-add" style="margin-top:6px;">Enregistrer</button>
-      </div>`;
-    }
-  }
+  html += `<button class="btn add-btn-primary" id="toggle-add-foodtruck">+ Ajouter un passage foodtruck</button>`;
 
   html += `<div class="section-h">Historique</div>`;
   if (entries.length === 0) {
@@ -437,7 +416,43 @@ function renderFoodtruckSection() {
     html += `</div>`;
   }
 
+  html += renderAddFoodtruckSheet(matches);
+
   return html;
+}
+
+// ===================== FICHE AJOUT FOODTRUCK (bottom sheet) =====================
+function renderAddFoodtruckSheet(matches) {
+  if (!window.__showAddFoodtruck) return "";
+  const bodyHtml = matches.length === 0
+    ? `<div class="muted">Aucun match à domicile enregistré pour l'instant.</div>`
+    : `
+      <label class="field-label">Nom du foodtruck</label>
+      <input id="foodtruck-nom" type="text" placeholder="Ex: Chez Mario — Pizza" />
+      <label class="field-label">Match associé</label>
+      <select id="foodtruck-event">
+        ${matches.map(ev => `<option value="${escapeHtml(ev[0])}">${eventDateObj(ev).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} — ${escapeHtml(eventEquipe(ev))} — ${escapeHtml(formatMatchDisplay(ev[4], ev[5]).label || ev[4] || "Match")}</option>`).join("")}
+      </select>
+      <label class="field-label">Prix / menu</label>
+      <input id="foodtruck-prix" type="text" placeholder="Ex: 8€ la part" />
+      <label class="field-label">Bénéfice pour le club (€)</label>
+      <input id="foodtruck-benefice" type="number" step="0.5" placeholder="Ex: 85" />
+      <label class="field-label">Notes (optionnel)</label>
+      <input id="foodtruck-notes" type="text" placeholder="Ex: bien venu, prévoir 2 emplacements..." />
+      <button class="btn" id="foodtruck-add" style="margin-top:12px;">Enregistrer</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddFoodtruck">
+    <div class="sheet-scrim" data-close-sheet="showAddFoodtruck"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddFoodtruck">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Gestion des matchs</div>
+        <h2>Ajouter un passage foodtruck</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
 }
 
 function renderGestionMatchsPage() {

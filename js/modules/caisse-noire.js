@@ -69,7 +69,8 @@ async function writeCell(player, actionIndex, value) {
   render();
 }
 
-function renderQuickAddForm() {
+function renderQuickAddSheet() {
+  if (!window.__showQuickAdd) return "";
   const target = window.__qaPlayer || (PLAYERS.includes(session.nom) ? session.nom : PLAYERS[0]);
   const actionIdx = window.__qaAction != null ? window.__qaAction : 0;
   const actionLabel = ACTIONS[actionIdx] ? ACTIONS[actionIdx][0] : "";
@@ -94,7 +95,7 @@ function renderQuickAddForm() {
     </div>`;
   }
 
-  return `<div class="add-form">
+  const bodyHtml = `
     <label class="field-label">Joueur</label>
     <select id="qa-player">
       ${PLAYERS.map(p => `<option value="${p}" ${p === target ? "selected" : ""}>${p}</option>`).join("")}
@@ -104,7 +105,19 @@ function renderQuickAddForm() {
       ${ACTIONS.map((a, i) => `<option value="${i}" ${i == actionIdx ? "selected" : ""}>${a[0]}${isRetard && i == actionIdx ? "" : ` (${fmt(a[1])} €)`}</option>`).join("")}
     </select>
     ${quantityBlock}
-    <button class="btn" id="qa-submit" style="margin-top:12px;">Ajouter</button>
+    <button class="btn" id="qa-submit" style="margin-top:12px;">Ajouter</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showQuickAdd">
+    <div class="sheet-scrim" data-close-sheet="showQuickAdd"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showQuickAdd">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Caisse noire</div>
+        <h2>Saisir une action</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
   </div>`;
 }
 
@@ -127,11 +140,7 @@ function renderCaisseNoireSummary() {
     <div class="cn-hero-sub">${fmt(totalPayeEquipe)} € déjà payé · ${fmt(resteEquipe)} € restant</div>
   </div>`;
 
-  html += `<button class="btn add-btn-primary" id="cn-add-action">${window.__showQuickAdd ? "− Fermer" : "+ Saisir une action"}</button>`;
-
-  if (window.__showQuickAdd) {
-    html += renderQuickAddForm();
-  }
+  html += `<button class="btn add-btn-primary" id="cn-add-action">+ Saisir une action</button>`;
 
   const isAdmin = hasRole("Admin");
   const FROZEN_ACTIONS = ["participation mensuelle"];
@@ -198,6 +207,8 @@ function renderCaisseNoireSummary() {
   if (isAdmin && window.__cnEditPlayer) {
     html += renderCaisseNoireEditSheet();
   }
+
+  html += renderQuickAddSheet();
 
   return html;
 }
