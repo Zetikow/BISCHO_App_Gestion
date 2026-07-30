@@ -35,8 +35,8 @@ function renderActualitesPage() {
 
   const filterOptions = actuFilterOptions();
   const activeFilter = (window.__actuFilter && filterOptions.includes(window.__actuFilter)) ? window.__actuFilter : filterOptions[0];
-  html += `<div class="team-switch-row">
-    ${filterOptions.map(t => `<button type="button" class="team-switch-btn actu-filter-btn ${t === activeFilter ? 'active' : ''}" data-actu-filter="${t}">Actualité<br>${t}</button>`).join("")}
+  html += `<div class="mode-tabs">
+    ${filterOptions.map(t => `<button type="button" class="mode-tab-btn actu-filter-btn ${t === activeFilter ? 'active' : ''}" data-actu-filter="${t}">Actualité<br>${t}</button>`).join("")}
   </div>`;
 
   let list = visibleActualites().filter(a => a[2] === activeFilter);

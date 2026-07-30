@@ -470,10 +470,10 @@ function renderGestionMatchsPage() {
   const activeInOverflow = overflowSections.some(s => s.id === section);
 
   let html = `<div class="page-title">Gestion des matchs</div><div class="page-sub">Covoiturage, goûter, table de marque et maillots${needsTeam ? " — équipe " + escapeHtml(activeTeam) : ""}</div>`;
-  html += `<div class="team-switch-row">
-    ${visibleSections.map(s => `<button type="button" class="team-switch-btn ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</button>`).join("")}
+  html += `<div class="mode-tabs">
+    ${visibleSections.map(s => `<button type="button" class="mode-tab-btn ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</button>`).join("")}
     ${overflowSections.length > 0 ? `<div class="gm-extra-wrap">
-      <button type="button" class="team-switch-btn gm-extra-trigger ${activeInOverflow ? 'active' : ''}" id="gm-extra-trigger">⋮</button>
+      <button type="button" class="mode-tab-btn gm-extra-trigger ${activeInOverflow ? 'active' : ''}" id="gm-extra-trigger">⋮</button>
       ${window.__gestionMatchsExtraOpen ? `<div class="avatar-menu gm-extra-menu">
         ${overflowSections.map(s => `<div class="avatar-menu-item ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</div>`).join("")}
       </div>` : ""}
