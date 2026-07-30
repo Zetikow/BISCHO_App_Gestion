@@ -39,7 +39,7 @@ body {
 .badge { font-size: 9px; padding: 2px 8px; border-radius: 8px; background: #1a1f30; color: var(--accent); border: 1px solid #243049; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
 
 .avatar-wrap { position: relative; z-index: 2; }
-.avatar-btn { width: 54px; height: 54px; border-radius: 15px; background: rgba(255,255,255,0.16); border: 2px solid #0d1b33; color: #0d1b33; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; font-family: var(--font-disp); cursor: pointer; transition: transform 0.12s; flex-shrink: 0; position: relative; z-index: 2; }
+.avatar-btn { width: 54px; height: 54px; border-radius: 15px; background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; font-family: var(--font-disp); cursor: pointer; transition: transform 0.12s; flex-shrink: 0; position: relative; z-index: 2; box-shadow: 0 4px 20px rgba(66,117,212,0.4), inset 0 1px 0 rgba(255,255,255,0.18); text-shadow: 0 0 14px rgba(255,255,255,0.55); }
 .avatar-btn:active, .avatar-btn.tap-active { transform: scale(0.92); }
 .avatar-menu { position: absolute; top: 60px; right: 0; background: #11141f; border: 1px solid rgba(47,107,255,0.28); border-radius: 14px; padding: 10px; min-width: 200px; z-index: 60; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .avatar-menu-name { font-size: 15px; font-weight: 800; color: #fff; padding: 4px 6px 2px; }
