@@ -482,12 +482,101 @@ function renderNextEventCard() {
 
   return `<div class="next-card"><div class="nc-inner">
     <div class="nc-glow"></div>
-    <span class="ev-type ${typeClass(type)}">${type || "Événement"}</span>
-    <div class="nc-countdown" style="margin-left:6px;">⚡ ${countdownLabel}</div>
-    <div class="nc-title">${ev[4] || "Événement"}</div>
-    <div class="nc-meta">${formatEventDateFr(ev)} ${ev[2] ? "· " + formatHeure(ev) : ""} ${ev[5] ? "· " + ev[5] : ""}</div>
+    <div class="sheet-open-zone" data-open-event-detail="${id}">
+      <span class="ev-type ${typeClass(type)}">${type || "Événement"}</span>
+      <div class="nc-countdown" style="margin-left:6px;">⚡ ${countdownLabel}</div>
+      <div class="nc-title">${ev[4] || "Événement"}</div>
+      <div class="nc-meta">${formatEventDateFr(ev)} ${ev[2] ? "· " + formatHeure(ev) : ""} ${ev[5] ? "· " + ev[5] : ""}</div>
+    </div>
     ${actionsHtml}
   </div></div>`;
+}
+
+// ===================== FICHE ÉVÉNEMENT (bottom sheet) =====================
+// Ouverte en tapant le corps d'une carte événement (Agenda ou "Prochain événement" de
+// l'Accueil) — voir window.__eventDetailId, câblé une seule fois côté core/render.js pour
+// fonctionner depuis n'importe quelle page. Le raccourci Présent/Absent reste directement
+// sur la carte (voir renderEventCard/renderNextEventCard) : la fiche ne fait que regrouper
+// le détail (lieu, présence, composition...), pas remplacer le geste rapide.
+function renderEventDetailSheet() {
+  const id = window.__eventDetailId;
+  if (!id) return "";
+  const ev = evenements.find(e => e[0] === id);
+  if (!ev) return "";
+  const [, date, heure, type, titre, lieu, equipe, score] = ev;
+  const displayTitre = typeClass(type) === "match" ? formatMatchDisplay(titre, lieu).label : (titre || "Sans titre");
+  const canManage = hasRole("Coach") || hasRole("Admin") || (hasRole("Salarié") && !hasRole("Joueur"));
+  const presIdentity = myPresenceIdentity();
+  const val = presenceEvenements[`${id}_${presIdentity.nom}`];
+  const isPast = eventDateObj(ev) < new Date();
+
+  let presentCount = 0, absentCount = 0;
+  const allNames = [...PLAYERS, "Coach", "Admin", "Bénévole"];
+  allNames.forEach(n => {
+    const v = presenceEvenements[`${id}_${n}`];
+    if (v === "Oui") presentCount++;
+    else if (v === "Non") absentCount++;
+  });
+
+  let html = `<div class="sheet-overlay open" data-close-sheet="1">
+    <div class="sheet-scrim" data-close-sheet="1"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="1">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">${escapeHtml(type || "Événement")}${equipe && equipe !== "Toutes" ? " · " + escapeHtml(teamDisplayLabel(equipe)) : ""}</div>
+        <h2>${escapeHtml(displayTitre)}</h2>
+        <p>${formatEventDateFr(ev)}${heure ? " · " + formatHeure(ev) : ""}</p>
+      </div>
+      <div class="sheet-body">`;
+
+  if (lieu) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+      <div><b>${escapeHtml(lieu)}</b><span>${typeClass(type) === "match" ? (isHomeMatch(lieu) ? "Match à domicile" : "Match à l'extérieur") : "Lieu du rendez-vous"}</span></div>
+    </div>`;
+  }
+
+  if (typeClass(type) === "match" && isPast && score) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2l2.7 6.6L21 9.3l-5 4.6L17.5 21 12 17.3 6.5 21 8 13.9l-5-4.6 6.3-0.7z"/></svg></div>
+      <div><b>Score final : ${escapeHtml(score)}</b><span>Match terminé</span></div>
+    </div>`;
+  }
+
+  if (canManage) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><b>${presentCount} présent${presentCount > 1 ? "s" : ""} · ${absentCount} absent${absentCount > 1 ? "s" : ""}</b><span>Réponses reçues</span></div>
+    </div>`;
+  } else if (!hasRole("Bénévole")) {
+    const statusLabel = val === "Oui" ? "✅ Présent" : val === "Non" ? "❌ Absent" : "⏳ Pas encore répondu";
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><b>${statusLabel}</b><span>Ta présence pour cet événement</span></div>
+    </div>`;
+  }
+
+  const compoButtons = renderCompositionCardButtons(ev);
+  if (compoButtons) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+      <div style="flex:1;"><b>Composition</b><span>${compositionIsPublished(id) ? "Publiée" : "Pas encore publiée"}</span></div>
+    </div>
+    <div style="padding-left:43px; margin-top:-4px;">${compoButtons}</div>`;
+  }
+
+  if (!isPast && !hasRole("Bénévole") && presIdentity.editable && !compositionNonSelected(ev, presIdentity.nom)) {
+    html += `<div class="row-flex" style="margin-top:8px;">
+      <button class="sheet-cta ${val === 'Oui' ? '' : 'secondary'}" style="flex:1;" data-event-presence="${id}" data-event-val="1">Présent</button>
+      <button class="sheet-cta secondary" style="flex:1; ${val === 'Non' ? 'background:rgba(255,90,90,0.16); border-color:rgba(255,90,90,0.4); color:#ff8a8a;' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+    </div>`;
+  }
+
+  html += `</div>
+    </div>
+  </div>`;
+  return html;
 }
 
 function renderGenerateTrainingsForm(equipe) {
@@ -720,12 +809,14 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
           <div class="avatar-menu-item danger" data-delete-event="${id}">✕ Supprimer</div>
         </div>` : ""}
       </div>` : ""}
-      <div class="ev-header-row">
-        <div class="ev-title-big">${escapeHtml(displayTitre)}</div>
-        <span class="ev-type-big ${typeClass(type)}">${type || "Événement"}</span>
+      <div class="sheet-open-zone" data-open-event-detail="${id}">
+        <div class="ev-header-row">
+          <div class="ev-title-big">${escapeHtml(displayTitre)}</div>
+          <span class="ev-type-big ${typeClass(type)}">${type || "Événement"}</span>
+        </div>
+        <div class="ev-date-full">${dateFr}${heureFmt ? " · " + heureFmt : ""}</div>
+        <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
       </div>
-      <div class="ev-date-full">${dateFr}${heureFmt ? " · " + heureFmt : ""}</div>
-      <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
       ${(!isPast && !hasRole("Bénévole")) ? (
         compositionNonSelected(ev, presIdentity.nom)
           ? `<div class="composition-not-selected-badge">🔒 Non sélectionné</div>`
@@ -806,6 +897,22 @@ async function generateSeasonTrainingsApi(equipe, startMardi, heureMardi, lieuMa
 }
 
 function attachAgendaEvents() {
+  document.querySelectorAll("[data-open-event-detail]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      window.__eventDetailId = el.dataset.openEventDetail;
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-close-sheet]").forEach(el => {
+    el.onclick = (e) => {
+      if (e.target !== e.currentTarget) return; // ne ferme pas si on clique dans la fiche elle-même
+      window.__eventDetailId = null;
+      render();
+    };
+  });
+
   document.querySelectorAll("[data-event-presence]").forEach(btn => {
     btn.onclick = (e) => {
       vibrate();

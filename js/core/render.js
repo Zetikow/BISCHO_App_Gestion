@@ -596,6 +596,11 @@ function render() {
   }
   html += `</div>`;
 
+  // Fiche événement (bottom sheet) : ajoutée en dehors du switch par page ci-dessus pour
+  // pouvoir s'ouvrir depuis n'importe quelle page (Accueil, Agenda...) — voir
+  // renderEventDetailSheet dans agenda.js et window.__eventDetailId.
+  if (window.__eventDetailId) html += renderEventDetailSheet();
+
   app.innerHTML = html;
   attachEvents();
   if (session) positionNavPill();
