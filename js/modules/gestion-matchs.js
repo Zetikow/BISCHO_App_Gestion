@@ -136,13 +136,74 @@ function gestionMatchsUpcoming(activeTeam, homeFilter) {
   }).sort((a, b) => eventDateObj(a) - eventDateObj(b));
 }
 
-function matchCardHeader(ev, badges) {
-  const [, , , , titre, lieu] = ev;
+// section identifie quelle liste ouvrir dans la fiche (voir renderGestionMatchsDetailSheet) au
+// tap sur l'en-tête — le raccourci personnel (cp-edit-box, juste en dessous) reste lui toujours
+// directement sur la carte, jamais caché dans la fiche.
+function matchCardHeader(ev, badges, section) {
+  const [id, , , , titre, lieu] = ev;
   const d = eventDateObj(ev);
   const dateLabel = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }).replace(".", "").toUpperCase();
-  return `<div class="cp-match-head">
+  return `<div class="cp-match-head sheet-open-zone" data-open-gm-detail="${section}|||${escapeHtml(id)}">
     <div><div class="cp-match-title">${escapeHtml(titre || "Match")}</div><div class="cp-match-sub">${dateLabel} · ${formatHeure(ev) || ""} · ${escapeHtml(lieu || "")}</div></div>
     <div style="display:flex; gap:6px;">${badges}</div>
+  </div>`;
+}
+
+// Fiche (bottom sheet) listant qui fait quoi pour un match, sur l'une des 4 sections
+// Covoiturage/Goûter/Table de marque/Maillots — ouverte au tap sur l'en-tête d'une carte.
+function renderGestionMatchsDetailSheet() {
+  const ctx = window.__gmDetailFor;
+  if (!ctx) return "";
+  const [section, matchId] = ctx.split("|||");
+  const ev = evenements.find(e => e[0] === matchId);
+  if (!ev) return "";
+  const [, , , , titre, lieu] = ev;
+  const displayTitre = typeClass(ev[3]) === "match" ? formatMatchDisplay(titre, lieu).label : (titre || "Événement");
+
+  const emptyRow = `<div class="cp-empty">Personne pour l'instant</div>`;
+  const personRow = (nom, extra) => `<div class="cp-row"><span>${escapeHtml(nom)}</span>${extra ? `<span class="places">${escapeHtml(extra)}</span>` : ""}</div>`;
+
+  let sectionLabel = "", bodyHtml = "";
+  if (section === "covoiturage") {
+    sectionLabel = "Covoiturage";
+    const entries = covoiturage.filter(r => r[0] === matchId);
+    const drivers = entries.filter(r => r[2] === "Oui");
+    const needers = entries.filter(r => r[4] === "Oui");
+    bodyHtml = `<div class="cp-col-h driver">🚗 Conducteurs (${drivers.length})</div>
+      ${drivers.length === 0 ? emptyRow : drivers.map(r => personRow(r[1], (r[3] || "?") + " places")).join("")}
+      <div class="cp-col-h need" style="margin-top:12px;">🙋 Cherchent une place (${needers.length})</div>
+      ${needers.length === 0 ? emptyRow : needers.map(r => personRow(r[1])).join("")}`;
+  } else if (section === "gouter") {
+    sectionLabel = "Goûter";
+    const entries = gouter.filter(r => r[0] === matchId);
+    bodyHtml = `<div class="cp-col-h" style="color:#c98cf0;">🍪 Apportent quelque chose (${entries.length})</div>
+      ${entries.length === 0 ? emptyRow : entries.map(r => personRow(r[1], r[2])).join("")}`;
+  } else if (section === "tablemarque") {
+    sectionLabel = "Table de marque";
+    const entries = tableMarque.filter(r => r[0] === matchId);
+    bodyHtml = `<div class="cp-col-h driver">📋 Disponibles (${entries.length})</div>
+      ${entries.length === 0 ? emptyRow : entries.map(r => personRow(r[1])).join("")}`;
+  } else if (section === "maillots") {
+    sectionLabel = "Maillots";
+    const entries = maillots.filter(r => r[0] === matchId && r[2] === "Oui");
+    bodyHtml = `<div class="cp-col-h" style="color:#E8B84B;">👕 Prennent les maillots (${entries.length})</div>
+      ${entries.length === 0 ? emptyRow : entries.map(r => personRow(r[1])).join("")}`;
+  } else {
+    return "";
+  }
+
+  return `<div class="sheet-overlay open" data-close-sheet="gmDetailFor">
+    <div class="sheet-scrim" data-close-sheet="gmDetailFor"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="gmDetailFor">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">${escapeHtml(sectionLabel)}</div>
+        <h2>${escapeHtml(displayTitre)}</h2>
+        <p>${formatEventDateFr(ev)}${lieu ? " · " + escapeHtml(lieu) : ""}</p>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
   </div>`;
 }
 
@@ -160,16 +221,7 @@ function renderCovoiturageSection(activeTeam) {
     html += `<div class="cp-match-card">` + matchCardHeader(ev, `
       <div class="cp-summary-badge"><div class="num" style="color:#33d17a;">${totalPlaces}</div><div class="lbl">Places</div></div>
       <div class="cp-summary-badge"><div class="num" style="color:#ffb43c;">${needers.length}</div><div class="lbl">Demandes</div></div>
-    `) + `<div class="cp-cols">
-        <div class="cp-col">
-          <div class="cp-col-h driver">🚗 Conducteurs</div>
-          ${drivers.length === 0 ? `<div class="cp-empty">Personne pour l'instant</div>` : drivers.map(r => `<div class="cp-row"><span>${escapeHtml(r[1])}</span><span class="places">${escapeHtml(r[3] || "?")} pl.</span></div>`).join("")}
-        </div>
-        <div class="cp-col">
-          <div class="cp-col-h need">🙋 Cherchent une place</div>
-          ${needers.length === 0 ? `<div class="cp-empty">Personne pour l'instant</div>` : needers.map(r => `<div class="cp-row"><span>${escapeHtml(r[1])}</span></div>`).join("")}
-        </div>
-      </div>`;
+    `, "covoiturage");
 
     if (identities.length === 0) {
       html += `<div class="muted" style="font-size:9.5px; margin-top:10px; text-align:center;">Seul ton parent peut modifier cette page pour toi.</div>`;
@@ -207,10 +259,7 @@ function renderGouterSection(activeTeam) {
     const entries = gouter.filter(r => r[0] === id);
     html += `<div class="cp-match-card">` + matchCardHeader(ev, `
       <div class="cp-summary-badge"><div class="num" style="color:#c98cf0;">${entries.length}</div><div class="lbl">Inscrits</div></div>
-    `) + `<div class="cp-col">
-        <div class="cp-col-h" style="color:#c98cf0;">🍪 Apportent quelque chose</div>
-        ${entries.length === 0 ? `<div class="cp-empty">Personne pour l'instant</div>` : entries.map(r => `<div class="cp-row"><span>${escapeHtml(r[1])}</span><span class="places">${escapeHtml(r[2] || "")}</span></div>`).join("")}
-      </div>`;
+    `, "gouter");
 
     if (identities.length === 0) {
       html += `<div class="muted" style="font-size:9.5px; margin-top:10px; text-align:center;">Seul ton parent peut modifier cette page pour toi.</div>`;
@@ -239,10 +288,7 @@ function renderTableMarqueSection(activeTeam) {
     const entries = tableMarque.filter(r => r[0] === id);
     html += `<div class="cp-match-card">` + matchCardHeader(ev, `
       <div class="cp-summary-badge"><div class="num" style="color:#33d17a;">${entries.length}</div><div class="lbl">Disponibles</div></div>
-    `) + `<div class="cp-col">
-        <div class="cp-col-h driver">📋 Disponibles pour la table</div>
-        ${entries.length === 0 ? `<div class="cp-empty">Personne pour l'instant</div>` : entries.map(r => `<div class="cp-row"><span>${escapeHtml(r[1])}</span></div>`).join("")}
-      </div>`;
+    `, "tablemarque");
 
     if (identities.length === 0) {
       html += `<div class="muted" style="font-size:9.5px; margin-top:10px; text-align:center;">Seul ton parent peut modifier cette page pour toi.</div>`;
@@ -279,10 +325,7 @@ function renderMaillotsSection(activeTeam) {
     const entries = maillots.filter(r => r[0] === id && r[2] === "Oui");
     html += `<div class="cp-match-card">` + matchCardHeader(ev, `
       <div class="cp-summary-badge"><div class="num" style="color:#E8B84B;">${entries.length}</div><div class="lbl">Pris</div></div>
-    `) + `<div class="cp-col">
-        <div class="cp-col-h" style="color:#E8B84B;">👕 Prennent les maillots</div>
-        ${entries.length === 0 ? `<div class="cp-empty">Personne pour l'instant</div>` : entries.map(r => `<div class="cp-row"><span>${escapeHtml(r[1])}</span></div>`).join("")}
-      </div>`;
+    `, "maillots");
 
     if (identities.length === 0) {
       html += `<div class="muted" style="font-size:9.5px; margin-top:10px; text-align:center;">Seul ton parent peut modifier cette page pour toi.</div>`;
@@ -429,6 +472,8 @@ function renderGestionMatchsPage() {
   else if (section === "maillots") html += renderMaillotsSection(activeTeam);
   else if (section === "foodtruck" && canManageFoodtrucks()) html += renderFoodtruckSection();
 
+  if (window.__gmDetailFor) html += renderGestionMatchsDetailSheet();
+
   return html;
 }
 
@@ -499,6 +544,14 @@ function renderCovoiturageHistoryCard(nom) {
 }
 
 function attachGestionMatchsEvents() {
+  document.querySelectorAll("[data-open-gm-detail]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      window.__gmDetailFor = el.dataset.openGmDetail;
+      render();
+    };
+  });
+
   document.querySelectorAll("[data-gestion-matchs-section]").forEach(el => {
     el.onclick = () => {
       vibrate();
