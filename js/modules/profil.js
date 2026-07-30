@@ -168,9 +168,9 @@ function renderProfilPage() {
   html += EMAIL_REMINDER_UI_VISIBLE ? renderEmailCard(myRow) : "";
 
   if (showVueToggle) {
-    html += `<div class="team-switch-row">
-      <button type="button" class="team-switch-btn ${vue === 'joueur' ? 'active' : ''}" data-profil-vue="joueur">Vue Joueur</button>
-      <button type="button" class="team-switch-btn ${vue === 'coach' ? 'active' : ''}" data-profil-vue="coach">Vue Coach</button>
+    html += `<div class="mode-tabs">
+      <button type="button" class="mode-tab-btn ${vue === 'joueur' ? 'active' : ''}" data-profil-vue="joueur">Vue Joueur</button>
+      <button type="button" class="mode-tab-btn ${vue === 'coach' ? 'active' : ''}" data-profil-vue="coach">Vue Coach</button>
     </div>`;
   }
 

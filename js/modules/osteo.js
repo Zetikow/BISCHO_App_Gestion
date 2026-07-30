@@ -33,9 +33,9 @@ function renderOsteoPage() {
   const tab = (window.__osteoTab === "mes") ? "mes" : "dispo";
 
   let html = `<div class="page-title">RDV Ostéo</div><div class="page-sub">Avec Eve, ostéopathe du club.</div>`;
-  html += `<div class="team-switch-row">
-    <button type="button" class="team-switch-btn ${tab === 'dispo' ? 'active' : ''}" data-osteo-tab="dispo">Disponibles</button>
-    <button type="button" class="team-switch-btn ${tab === 'mes' ? 'active' : ''}" data-osteo-tab="mes">Mes RDV</button>
+  html += `<div class="mode-tabs">
+    <button type="button" class="mode-tab-btn ${tab === 'dispo' ? 'active' : ''}" data-osteo-tab="dispo">Disponibles</button>
+    <button type="button" class="mode-tab-btn ${tab === 'mes' ? 'active' : ''}" data-osteo-tab="mes">Mes RDV</button>
   </div>`;
 
   html += renderOsteoPlayerView(tab);

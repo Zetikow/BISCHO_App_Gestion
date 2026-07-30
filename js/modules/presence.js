@@ -176,9 +176,9 @@ function renderPresencePage() {
   html += renderTeamSwitcher(switcherTeams, activeTeam, "presence-team");
 
   if (canManage) {
-    html += `<div class="team-switch-row">
-      <button type="button" class="team-switch-btn ${view === 'presence' ? 'active' : ''}" data-presence-subview="presence">Présence</button>
-      <button type="button" class="team-switch-btn ${view === 'selection' ? 'active' : ''}" data-presence-subview="selection">Sélection</button>
+    html += `<div class="mode-tabs">
+      <button type="button" class="mode-tab-btn ${view === 'presence' ? 'active' : ''}" data-presence-subview="presence">Présence</button>
+      <button type="button" class="mode-tab-btn ${view === 'selection' ? 'active' : ''}" data-presence-subview="selection">Sélection</button>
     </div>`;
   }
 
