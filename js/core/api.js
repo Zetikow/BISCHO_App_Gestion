@@ -6,11 +6,13 @@
 // ===================================================================
 
 async function fetchAll() {
+  let rawText = null;
   try {
     const params = new URLSearchParams({ action: "getAll", authNom: session.nom, authCode: session.code });
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     if (!res.ok) throw new Error("bad response");
-    const data = await res.json();
+    rawText = await res.text();
+    const data = JSON.parse(rawText);
     if (!data.ok) throw new Error(data.error || "auth");
     grid = parseSheetData(data.grid);
     comptes = data.comptes || [];
@@ -35,9 +37,21 @@ async function fetchAll() {
   } catch (err) {
     isOnline = false;
   }
-  // Ne pas reconstruire l'affichage si un formulaire de saisie est ouvert
-  // (évite d'interrompre un sélecteur de date/heure natif en cours d'utilisation)
-  if (!isFormOpen()) render();
+  // Ne reconstruit l'affichage que si les données (ou le statut en ligne/hors ligne) ont
+  // réellement changé depuis le dernier rendu — la plupart des sondages toutes les 10s ne
+  // changent rien — et jamais si un formulaire est ouvert ou qu'un champ/menu déroulant a
+  // actuellement le focus, sinon la synchro périodique se voit (saut de page) ou coupe une
+  // saisie/un menu natif en cours. Les deux marqueurs "__lastFetchAllRaw"/"__lastRenderedOnline"
+  // n'avancent que lors d'un rendu effectif : si un rendu est sauté pendant une saisie, le
+  // prochain sondage retente dès que l'utilisateur relâche le champ, au lieu de rester bloqué sur
+  // un affichage périmé (données ou bandeau "Hors ligne").
+  const dataChanged = rawText !== null && rawText !== window.__lastFetchAllRaw;
+  const onlineStatusChanged = isOnline !== window.__lastRenderedOnlineStatus;
+  if ((dataChanged || onlineStatusChanged) && !isFormOpen() && !isActivelyEditing()) {
+    if (rawText !== null) window.__lastFetchAllRaw = rawText;
+    window.__lastRenderedOnlineStatus = isOnline;
+    render();
+  }
 }
 
 function startPolling() {

@@ -162,6 +162,16 @@ function isFormOpen() {
   return !!window.__compositionDragActive || !!showAddEvent || !!window.__editingEvenementId || !!window.__editingPaiementId || !!window.__showAddPaiement || !!window.__showChangeCode || !!window.__showGenerateTrainings || !!window.__profilPosteAdding || (window.__profilPosteEditIndex !== null && window.__profilPosteEditIndex !== undefined) || !!window.__showAddActualite || !!window.__cnEditPlayer || !!window.__showSalariesAdd || !!window.__salariesPreviewFile || !!window.__salariesUploading || !!window.__profilEmailEditing || currentPage === "support" || !!window.__showAddOsteoSlot || !!window.__osteoReassignId || !!window.__osteoReserveSlotId;
 }
 
+// Détection générique (pas de liste à maintenir à la main comme isFormOpen ci-dessus) : si le
+// focus est actuellement dans un champ de saisie ou un menu déroulant, on ne reconstruit pas la
+// page au prochain rafraîchissement périodique — sinon ça coupe la frappe ou ferme un menu
+// déroulant natif ouvert en plein milieu d'une interaction.
+function isActivelyEditing() {
+  const el = document.activeElement;
+  if (!el) return false;
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+}
+
 function logout() {
   session = null;
   localStorage.removeItem(SESSION_KEY);
