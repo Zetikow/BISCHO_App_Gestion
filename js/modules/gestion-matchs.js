@@ -23,8 +23,15 @@ function canManageFoodtrucks() {
   return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
 }
 
-function gestionMatchsSectionsForRole() {
-  return GESTION_MATCHS_SECTIONS.filter(s => s.id !== "foodtruck" || canManageFoodtrucks());
+// SM1 ne gère pas le goûter/la table de marque/les maillots/les foodtrucks — seul le
+// covoiturage les concerne (demande club, ne s'applique pas aux autres équipes).
+const GESTION_MATCHS_TEAM_EXCLUDED_SECTIONS = {
+  SM1: ["gouter", "tablemarque", "maillots", "foodtruck"],
+};
+
+function gestionMatchsSectionsForRole(activeTeam) {
+  const excluded = GESTION_MATCHS_TEAM_EXCLUDED_SECTIONS[activeTeam] || [];
+  return GESTION_MATCHS_SECTIONS.filter(s => (s.id !== "foodtruck" || canManageFoodtrucks()) && !excluded.includes(s.id));
 }
 
 // Nombre de sections affichées directement (les plus utilisées) avant de basculer les
@@ -48,9 +55,9 @@ function bumpGestionMatchsUsage(id) {
 
 // Sections triées par usage décroissant (les plus cliquées en premier) — tri stable, donc à
 // usage égal (ex: 0 clic, première visite) on garde l'ordre par défaut de GESTION_MATCHS_SECTIONS.
-function gestionMatchsSectionsSorted() {
+function gestionMatchsSectionsSorted(activeTeam) {
   const counts = gestionMatchsUsageCounts();
-  return gestionMatchsSectionsForRole()
+  return gestionMatchsSectionsForRole(activeTeam)
     .map((s, i) => ({ s, i, n: counts[s.id] || 0 }))
     .sort((a, b) => b.n - a.n || a.i - b.i)
     .map(x => x.s);
@@ -461,8 +468,8 @@ function renderGestionMatchsPage() {
     return `<div class="page-title">Gestion des matchs</div><div class="card"><div class="muted">Aucune équipe concernée pour ce compte.</div></div>`;
   }
   const activeTeam = (window.__covoitTeamView && teams.includes(window.__covoitTeamView)) ? window.__covoitTeamView : teams[0];
-  const sortedSections = gestionMatchsSectionsSorted();
-  const section = sortedSections.some(s => s.id === window.__gestionMatchsSection) ? window.__gestionMatchsSection : "covoiturage";
+  const sortedSections = gestionMatchsSectionsSorted(activeTeam);
+  const section = sortedSections.some(s => s.id === window.__gestionMatchsSection) ? window.__gestionMatchsSection : (sortedSections[0] ? sortedSections[0].id : "covoiturage");
   const needsTeam = section !== "foodtruck"; // les foodtrucks ne concernent aucune équipe en particulier
 
   const visibleSections = sortedSections.slice(0, GESTION_MATCHS_VISIBLE_COUNT);
