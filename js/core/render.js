@@ -479,6 +479,92 @@ function getTabsForRole() {
 
 let __lastRenderedPage = null;
 
+// ===================== ANIMATION DES FICHES (depuis la carte tapée) =====================
+// window.__sheetOriginRect est posé par le listener global de core/utils.js juste avant le
+// clic qui ouvre une fiche (voir SHEET_OPEN_TRIGGER_SELECTOR) — playSheetOpenAnimation() le
+// consomme ici pour faire "grandir" la fiche depuis cet endroit plutôt que glisser depuis le
+// bas de l'écran. window.__sheetCloseOrigin garde la même position pour l'animation inverse à
+// la fermeture (voir closeSheetAnimated, utilisé par data-close-sheet et data-cn-edit-cancel).
+function prefersReducedMotion() {
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function playSheetOpenAnimation() {
+  const origin = window.__sheetOriginRect;
+  window.__sheetOriginRect = null;
+  if (!origin) return;
+  const sheet = document.querySelector(".sheet-overlay.open .sheet");
+  const scrim = document.querySelector(".sheet-overlay.open .sheet-scrim");
+  if (!sheet) return;
+  window.__sheetCloseOrigin = origin;
+  if (prefersReducedMotion()) return;
+
+  const finalRect = sheet.getBoundingClientRect();
+  sheet.style.transition = "none";
+  sheet.style.transform = "none";
+  sheet.style.position = "fixed";
+  sheet.style.left = origin.left + "px";
+  sheet.style.top = origin.top + "px";
+  sheet.style.width = origin.width + "px";
+  sheet.style.height = origin.height + "px";
+  sheet.style.maxHeight = "none";
+  sheet.style.borderRadius = "16px";
+  sheet.style.opacity = "0.6";
+  sheet.style.overflow = "hidden"; // évite que le contenu ne déborde pendant que la fiche est encore de la taille de la carte
+  if (scrim) { scrim.style.transition = "none"; scrim.style.opacity = "0"; }
+  void sheet.offsetHeight; // force le reflow avant de lancer la transition
+
+  sheet.style.transition = "left 0.36s cubic-bezier(.22,.9,.24,1), top 0.36s cubic-bezier(.22,.9,.24,1), width 0.36s cubic-bezier(.22,.9,.24,1), height 0.36s cubic-bezier(.22,.9,.24,1), border-radius 0.36s cubic-bezier(.22,.9,.24,1), opacity 0.28s ease";
+  requestAnimationFrame(() => {
+    sheet.style.left = finalRect.left + "px";
+    sheet.style.top = finalRect.top + "px";
+    sheet.style.width = finalRect.width + "px";
+    sheet.style.height = finalRect.height + "px";
+    sheet.style.borderRadius = "22px";
+    sheet.style.opacity = "1";
+    if (scrim) { scrim.style.transition = "opacity 0.3s ease"; scrim.style.opacity = "1"; }
+  });
+  setTimeout(() => {
+    sheet.style.transition = "";
+    sheet.style.transform = "";
+    sheet.style.position = "";
+    sheet.style.left = ""; sheet.style.top = ""; sheet.style.width = ""; sheet.style.height = "";
+    sheet.style.maxHeight = ""; sheet.style.borderRadius = ""; sheet.style.opacity = ""; sheet.style.overflow = "";
+  }, 380);
+}
+
+// Rétracte la fiche vers la carte qui l'a ouverte avant d'exécuter onDone (qui remet le flag à
+// null et relance render()) — sans origine connue ou animations réduites, ferme immédiatement.
+function closeSheetAnimated(sheetOverlayEl, onDone) {
+  const sheet = sheetOverlayEl.querySelector(".sheet");
+  const scrim = sheetOverlayEl.querySelector(".sheet-scrim");
+  const origin = window.__sheetCloseOrigin;
+  if (!sheet || !origin || prefersReducedMotion()) { onDone(); return; }
+
+  const currentRect = sheet.getBoundingClientRect();
+  sheet.style.transition = "none";
+  sheet.style.transform = "none";
+  sheet.style.position = "fixed";
+  sheet.style.left = currentRect.left + "px";
+  sheet.style.top = currentRect.top + "px";
+  sheet.style.width = currentRect.width + "px";
+  sheet.style.height = currentRect.height + "px";
+  sheet.style.overflow = "hidden";
+  void sheet.offsetHeight;
+
+  sheet.style.transition = "left 0.3s cubic-bezier(.4,0,.2,1), top 0.3s cubic-bezier(.4,0,.2,1), width 0.3s cubic-bezier(.4,0,.2,1), height 0.3s cubic-bezier(.4,0,.2,1), border-radius 0.3s cubic-bezier(.4,0,.2,1), opacity 0.24s ease";
+  requestAnimationFrame(() => {
+    sheet.style.left = origin.left + "px";
+    sheet.style.top = origin.top + "px";
+    sheet.style.width = origin.width + "px";
+    sheet.style.height = origin.height + "px";
+    sheet.style.borderRadius = "16px";
+    sheet.style.opacity = "0.4";
+    if (scrim) { scrim.style.transition = "opacity 0.3s ease"; scrim.style.opacity = "0"; }
+  });
+  setTimeout(onDone, 300);
+}
+
 function render() {
   const app = document.getElementById("app");
 
@@ -603,6 +689,7 @@ function render() {
 
   app.innerHTML = html;
   attachEvents();
+  playSheetOpenAnimation();
   if (session) positionNavPill();
 
   // Restaure la position de défilement après reconstruction — sauf si on vient de changer

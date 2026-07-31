@@ -442,10 +442,14 @@ function attachCaisseNoireEvents() {
   document.querySelectorAll("[data-cn-edit-cancel]").forEach(el => {
     el.onclick = (e) => {
       if (e.target !== e.currentTarget) return;
-      window.__cnEditPlayer = null;
-      window.__cnEditActionIndex = null;
-      window.__cnEditQty = null;
-      render();
+      const overlay = el.closest(".sheet-overlay");
+      const doClose = () => {
+        window.__cnEditPlayer = null;
+        window.__cnEditActionIndex = null;
+        window.__cnEditQty = null;
+        render();
+      };
+      if (overlay) closeSheetAnimated(overlay, doClose); else doClose();
     };
   });
 

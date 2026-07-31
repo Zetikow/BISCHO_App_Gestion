@@ -73,8 +73,10 @@ function attachCoreNavEvents() {
   document.querySelectorAll("[data-close-sheet]").forEach(el => {
     el.onclick = (e) => {
       if (e.target !== e.currentTarget) return; // ne ferme pas si on clique dans la fiche elle-même
-      window["__" + el.dataset.closeSheet] = null;
-      render();
+      const flagName = el.dataset.closeSheet;
+      const overlay = el.closest(".sheet-overlay");
+      const doClose = () => { window["__" + flagName] = null; render(); };
+      if (overlay) closeSheetAnimated(overlay, doClose); else doClose();
     };
   });
 

@@ -144,6 +144,18 @@ document.addEventListener("touchstart", (e) => {
   }, { passive: true });
 });
 
+// Capture la position/taille de la carte tapée juste avant qu'un clic n'ouvre une fiche (bottom
+// sheet), pour que playSheetOpenAnimation() (core/render.js) puisse la faire "grandir" depuis
+// cet endroit plutôt que glisser depuis le bas de l'écran. Capture phase : s'exécute avant les
+// gestionnaires onclick spécifiques à chaque module qui, eux, déclenchent le render() d'ouverture.
+const SHEET_OPEN_TRIGGER_SELECTOR = ".sheet-open-zone, .add-btn-primary, [data-cn-toggle-edit], [data-open-presence-detail]";
+document.addEventListener("click", (e) => {
+  const el = e.target.closest(SHEET_OPEN_TRIGGER_SELECTOR);
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  window.__sheetOriginRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+}, true);
+
 // ---------- Compression d'image avant upload ----------
 // Réduit une photo prise depuis un téléphone (souvent plusieurs Mo) à une taille raisonnable
 // avant envoi — c'est ce qui évite la sensation de "chargement dans le vide" lors de l'upload :
