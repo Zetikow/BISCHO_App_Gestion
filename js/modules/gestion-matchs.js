@@ -15,24 +15,32 @@ const GESTION_MATCHS_SECTIONS = [
   { id: "gouter", label: "Goûter" },
   { id: "tablemarque", label: "Table de marque" },
   { id: "maillots", label: "Maillots" },
-  { id: "foodtruck", label: "Foodtrucks" },
+  { id: "repas", label: "Repas" },
 ];
 
 // Suivi financier des foodtrucks : réservé Admin/Coach/Salarié, pas un onglet joueur/parent.
+// Fonction gardée telle quelle (même si l'onglet Foodtrucks n'est plus affiché) : le code de
+// suivi des foodtrucks reste dans le fichier, juste retiré de GESTION_MATCHS_SECTIONS, au cas
+// où le club voudrait le remettre plus tard.
 function canManageFoodtrucks() {
   return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
 }
 
-// SM1 et SM2 ne gèrent pas le goûter/la table de marque/les maillots/les foodtrucks — seul
-// le covoiturage les concerne (demande club, ne s'applique pas à U17M1).
+// Suivi du repas d'après-match : mêmes rôles que les foodtrucks qu'il remplace.
+function canManageRepas() {
+  return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
+}
+
+// SM1 et SM2 ne gèrent pas le goûter/la table de marque/les maillots/le repas d'après-match —
+// seul le covoiturage les concerne (demande club, ne s'applique pas à U17M1).
 const GESTION_MATCHS_TEAM_EXCLUDED_SECTIONS = {
-  SM1: ["gouter", "tablemarque", "maillots", "foodtruck"],
-  SM2: ["gouter", "tablemarque", "maillots", "foodtruck"],
+  SM1: ["gouter", "tablemarque", "maillots", "repas"],
+  SM2: ["gouter", "tablemarque", "maillots", "repas"],
 };
 
 function gestionMatchsSectionsForRole(activeTeam) {
   const excluded = GESTION_MATCHS_TEAM_EXCLUDED_SECTIONS[activeTeam] || [];
-  return GESTION_MATCHS_SECTIONS.filter(s => (s.id !== "foodtruck" || canManageFoodtrucks()) && !excluded.includes(s.id));
+  return GESTION_MATCHS_SECTIONS.filter(s => (s.id !== "repas" || canManageRepas()) && !excluded.includes(s.id));
 }
 
 const GESTION_MATCHS_USAGE_KEY = "bischo-gestion-matchs-usage";
@@ -468,21 +476,22 @@ function renderGestionMatchsPage() {
   const activeTeam = (window.__covoitTeamView && teams.includes(window.__covoitTeamView)) ? window.__covoitTeamView : teams[0];
   const sortedSections = gestionMatchsSectionsSorted(activeTeam);
   const section = sortedSections.some(s => s.id === window.__gestionMatchsSection) ? window.__gestionMatchsSection : (sortedSections[0] ? sortedSections[0].id : "covoiturage");
-  const needsTeam = section !== "foodtruck"; // les foodtrucks ne concernent aucune équipe en particulier
+  const needsTeam = section !== "repas"; // le repas d'après-match ne concerne aucune équipe en particulier
 
   let html = `<div class="page-title">Gestion des matchs</div><div class="page-sub">Covoiturage, goûter, table de marque et maillots${needsTeam ? " — équipe " + escapeHtml(activeTeam) : ""}</div>`;
+  if (needsTeam) html += renderTeamSwitcher(teams, activeTeam, "covoit-team");
   html += `<div class="gm-section-grid">
     ${sortedSections.map(s => `<button type="button" class="gm-section-chip ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</button>`).join("")}
   </div>`;
-  if (needsTeam) html += renderTeamSwitcher(teams, activeTeam, "covoit-team");
 
   if (section === "covoiturage") html += renderCovoiturageSection(activeTeam);
   else if (section === "gouter") html += renderGouterSection(activeTeam);
   else if (section === "tablemarque") html += renderTableMarqueSection(activeTeam);
   else if (section === "maillots") html += renderMaillotsSection(activeTeam);
-  else if (section === "foodtruck" && canManageFoodtrucks()) html += renderFoodtruckSection();
+  else if (section === "repas" && canManageRepas()) html += renderRepasSection();
 
   if (window.__gmDetailFor) html += renderGestionMatchsDetailSheet();
+  if (window.__repasDetailFor) html += renderRepasDetailSheet();
 
   return html;
 }
@@ -524,6 +533,247 @@ async function updateFoodtruckApi(id, eventId, nom, prix, benefice, notes) {
 async function deleteFoodtruckApi(id) {
   try {
     const params = new URLSearchParams({ action: "deleteFoodtruck", id, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    await fetchAll();
+  } catch (err) { isOnline = false; render(); }
+}
+
+// ===================== REPAS D'APRÈS-MATCH =====================
+// Remplace le suivi des foodtrucks : un menu réutilisable d'un match à l'autre (RepasMenu), ce
+// qui est prévu pour un match donné (RepasPrevu, coché/décoché par plat), et le suivi financier
+// de l'organisation du match — pas un coût par plat, mais des dépenses/recettes globales pour
+// l'événement (RepasFinances) — le rendement (recette - dépense) est calculé ici, pas stocké.
+
+function repasHomeMatches() {
+  const teams = myCarpoolTeams();
+  return evenements.filter(ev => typeClass(ev[3]) === "match" && teams.includes(eventEquipe(ev)) && isHomeMatch(ev[5]))
+    .sort((a, b) => eventDateObj(b) - eventDateObj(a));
+}
+
+function repasPrevuFor(eventId, menuId) {
+  return repasPrevu.some(r => r[0] === eventId && r[1] === menuId);
+}
+
+function repasFinancesFor(eventId) {
+  return repasFinances.filter(r => r[1] === eventId);
+}
+
+function repasRendementFor(eventId) {
+  const entries = repasFinancesFor(eventId);
+  const recette = entries.filter(r => r[2] === "recette").reduce((s, r) => s + (parseFloat(r[4]) || 0), 0);
+  const depense = entries.filter(r => r[2] === "depense").reduce((s, r) => s + (parseFloat(r[4]) || 0), 0);
+  return { recette, depense, rendement: recette - depense };
+}
+
+function renderRepasSection() {
+  let html = `<div class="section-h" style="margin-top:0;">Menu (réutilisable)</div>`;
+  html += `<div class="card">`;
+  if (repasMenu.length === 0) {
+    html += `<div class="muted">Aucun plat dans le menu pour le moment.</div>`;
+  } else {
+    repasMenu.forEach(m => {
+      const [id, nom] = m;
+      html += `<div class="paiement-row">
+        <span style="color:#e8e8ee; font-weight:600;">${escapeHtml(nom)}</span>
+        ${iconBtn(ICON_CROSS, "ev-del", `data-delete-repas-menu-item="${escapeHtml(id)}"`)}
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  html += `<button class="btn add-btn-primary" id="toggle-add-repas-menu-item">+ Ajouter un plat au menu</button>`;
+
+  html += `<div class="section-h">Matchs à domicile</div>`;
+  const matches = repasHomeMatches();
+  if (matches.length === 0) {
+    html += `<div class="card muted">Aucun match à domicile enregistré pour l'instant.</div>`;
+  } else {
+    matches.forEach(ev => {
+      const [id, , , , titre, lieu] = ev;
+      const { rendement } = repasRendementFor(id);
+      const prevuCount = repasMenu.filter(m => repasPrevuFor(id, m[0])).length;
+      const rendementColor = rendement > 0 ? "#78c850" : (rendement < 0 ? "#ff5a5a" : "#8a92a8");
+      html += `<div class="card cn-card">
+        <div class="sheet-open-zone" data-open-repas-detail="${escapeHtml(id)}">
+          <div class="cn-name-row">
+            <span class="cn-name">${eventDateObj(ev).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} — ${escapeHtml(eventEquipe(ev))} — ${escapeHtml(formatMatchDisplay(titre, lieu).label || titre || "Match")}</span>
+            <span class="cn-amount" style="color:${rendementColor};">${rendement > 0 ? "+" : ""}${fmt(rendement)} €</span>
+          </div>
+          <div class="cn-hero-sub" style="margin-bottom:0;">${prevuCount} plat${prevuCount > 1 ? "s" : ""} prévu${prevuCount > 1 ? "s" : ""}</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  html += renderRepasMenuAddSheet();
+
+  return html;
+}
+
+function renderRepasMenuAddSheet() {
+  if (!window.__showAddRepasMenuItem) return "";
+  const bodyHtml = `
+    <label class="field-label">Nom du plat</label>
+    <input id="repas-menu-nom" type="text" placeholder="Ex: Merguez frites" />
+    <button class="btn" id="repas-menu-add" style="margin-top:12px;">Ajouter au menu</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddRepasMenuItem">
+    <div class="sheet-scrim" data-close-sheet="showAddRepasMenuItem"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddRepasMenuItem">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Menu</div>
+        <h2>Ajouter un plat</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
+}
+
+// ===================== FICHE MATCH (bottom sheet) — prévu + finances =====================
+function renderRepasDetailSheet() {
+  const eventId = window.__repasDetailFor;
+  if (!eventId) return "";
+  const ev = evenements.find(e => e[0] === eventId);
+  if (!ev) return "";
+  const [, , , , titre, lieu] = ev;
+  const displayTitre = formatMatchDisplay(titre, lieu).label || titre || "Match";
+  const entries = repasFinancesFor(eventId);
+  const { recette, depense, rendement } = repasRendementFor(eventId);
+  const rendementColor = rendement > 0 ? "#78c850" : (rendement < 0 ? "#ff5a5a" : "#fff");
+
+  const menuHtml = repasMenu.length === 0
+    ? `<div class="muted" style="font-size:12px;">Aucun plat dans le menu — ajoute-en depuis la liste principale.</div>`
+    : repasMenu.map(m => {
+        const [id, nom] = m;
+        const prevu = repasPrevuFor(eventId, id);
+        return `<button type="button" class="toggle-btn ${prevu ? "present" : ""}" style="width:100%; margin-bottom:6px; text-align:left; padding-left:12px;" data-toggle-repas-prevu="${escapeHtml(eventId)}|||${escapeHtml(id)}">${prevu ? "✓ " : ""}${escapeHtml(nom)}</button>`;
+      }).join("");
+
+  const financeRows = entries.length === 0
+    ? `<div class="muted" style="font-size:12px;">Aucune dépense ni recette enregistrée.</div>`
+    : entries.map(r => {
+        const [id, , type, label, montant] = r;
+        const isRecette = type === "recette";
+        return `<div class="paiement-row">
+          <div>
+            <span style="color:#e8e8ee; font-weight:600;">${escapeHtml(label || (isRecette ? "Recette" : "Dépense"))}</span>
+            <span class="badge" style="margin-left:6px; ${isRecette ? "color:#78c850; border-color:rgba(120,200,80,0.35);" : "color:#ff5a5a; border-color:rgba(255,90,90,0.35);"}">${isRecette ? "Recette" : "Dépense"}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:${isRecette ? "#78c850" : "#ff5a5a"}; font-weight:800;">${isRecette ? "+" : "−"}${fmt(Math.abs(parseFloat(montant) || 0))} €</span>
+            ${iconBtn(ICON_CROSS, "ev-del", `data-delete-repas-finance="${escapeHtml(id)}"`)}
+          </div>
+        </div>`;
+      }).join("");
+
+  const bodyHtml = `
+    <div class="pay-summary" style="margin-top:0;">
+      <div class="pay-summary-label">Rendement</div>
+      <div class="pay-summary-val" style="color:${rendementColor};">${rendement > 0 ? "+" : ""}${fmt(rendement)} €</div>
+      <div class="pay-summary-sub">${fmt(recette)} € de recette · ${fmt(depense)} € de dépense</div>
+    </div>
+
+    <div class="section-h">Ce qui est prévu</div>
+    ${menuHtml}
+
+    <div class="section-h">Finances</div>
+    ${financeRows}
+
+    <div class="add-form" style="margin-top:10px;">
+      <label class="field-label">Type</label>
+      <select id="repas-finance-type">
+        <option value="depense">Dépense</option>
+        <option value="recette">Recette</option>
+      </select>
+      <label class="field-label">Description</label>
+      <input id="repas-finance-label" type="text" placeholder="Ex: Achat merguez / Vente repas" />
+      <label class="field-label">Montant (€)</label>
+      <input id="repas-finance-montant" type="number" step="0.5" placeholder="Ex: 45" />
+      <button class="btn" id="repas-finance-add" style="margin-top:8px;" data-repas-finance-event="${escapeHtml(eventId)}">Ajouter</button>
+    </div>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="repasDetailFor">
+    <div class="sheet-scrim" data-close-sheet="repasDetailFor"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="repasDetailFor">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Repas d'après-match</div>
+        <h2>${escapeHtml(displayTitre)}</h2>
+        <p>${formatEventDateFr(ev)}${lieu ? " · " + escapeHtml(lieu) : ""}</p>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
+}
+
+// ===================== ACTIONS API : REPAS D'APRÈS-MATCH =====================
+
+async function addRepasMenuItemApi(nom) {
+  const tempId = "temp_" + Date.now();
+  repasMenu.push([tempId, nom]);
+  window.__showAddRepasMenuItem = false;
+  render();
+  try {
+    const params = new URLSearchParams({ action: "addRepasMenuItem", nom, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) { await fetchAll(); }
+    else { repasMenu = repasMenu.filter(r => r[0] !== tempId); showToast("Échec de l'ajout", "error"); render(); }
+  } catch (err) {
+    isOnline = false;
+    repasMenu = repasMenu.filter(r => r[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
+}
+
+async function deleteRepasMenuItemApi(id) {
+  repasMenu = repasMenu.filter(r => r[0] !== id); // optimiste
+  render();
+  try {
+    const params = new URLSearchParams({ action: "deleteRepasMenuItem", id, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    await fetchAll();
+  } catch (err) { isOnline = false; render(); }
+}
+
+async function setRepasPrevuApi(eventId, menuId, prevu) {
+  if (prevu) repasPrevu.push([eventId, menuId]);
+  else repasPrevu = repasPrevu.filter(r => !(r[0] === eventId && r[1] === menuId));
+  render();
+  try {
+    const params = new URLSearchParams({ action: "setRepasPrevu", eventId, menuId, prevu: prevu ? "1" : "0", authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    isOnline = true;
+  } catch (err) { isOnline = false; }
+  render();
+}
+
+async function addRepasFinanceApi(eventId, type, label, montant) {
+  const tempId = "temp_" + Date.now();
+  repasFinances.push([tempId, eventId, type, label, montant]);
+  render();
+  try {
+    const params = new URLSearchParams({ action: "addRepasFinance", eventId, type, label, montant, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) { await fetchAll(); }
+    else { repasFinances = repasFinances.filter(r => r[0] !== tempId); showToast("Échec de l'ajout", "error"); render(); }
+  } catch (err) {
+    isOnline = false;
+    repasFinances = repasFinances.filter(r => r[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
+}
+
+async function deleteRepasFinanceApi(id) {
+  repasFinances = repasFinances.filter(r => r[0] !== id); // optimiste
+  render();
+  try {
+    const params = new URLSearchParams({ action: "deleteRepasFinance", id, authNom: session.nom, authCode: session.code });
     await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     await fetchAll();
   } catch (err) { isOnline = false; render(); }
@@ -680,5 +930,52 @@ function attachGestionMatchsEvents() {
       const id = el.dataset.deleteFoodtruck;
       if (confirm("Supprimer ce passage foodtruck ?")) deleteFoodtruckApi(id);
     };
+  });
+
+  const toggleAddRepasMenuItem = document.getElementById("toggle-add-repas-menu-item");
+  if (toggleAddRepasMenuItem) toggleAddRepasMenuItem.onclick = () => {
+    vibrate();
+    window.__showAddRepasMenuItem = true;
+    render();
+  };
+
+  const repasMenuAdd = document.getElementById("repas-menu-add");
+  if (repasMenuAdd) repasMenuAdd.onclick = () => {
+    const nom = document.getElementById("repas-menu-nom").value.trim();
+    if (!nom) return;
+    addRepasMenuItemApi(nom);
+  };
+
+  document.querySelectorAll("[data-delete-repas-menu-item]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.deleteRepasMenuItem;
+      if (confirm("Retirer ce plat du menu ?")) deleteRepasMenuItemApi(id);
+    };
+  });
+
+  document.querySelectorAll("[data-open-repas-detail]").forEach(el => {
+    el.onclick = () => { vibrate(); window.__repasDetailFor = el.dataset.openRepasDetail; render(); };
+  });
+
+  document.querySelectorAll("[data-toggle-repas-prevu]").forEach(el => {
+    el.onclick = () => {
+      vibrate();
+      const [eventId, menuId] = el.dataset.toggleRepasPrevu.split("|||");
+      setRepasPrevuApi(eventId, menuId, !repasPrevuFor(eventId, menuId));
+    };
+  });
+
+  const repasFinanceAdd = document.getElementById("repas-finance-add");
+  if (repasFinanceAdd) repasFinanceAdd.onclick = () => {
+    const eventId = repasFinanceAdd.dataset.repasFinanceEvent;
+    const type = document.getElementById("repas-finance-type").value;
+    const label = document.getElementById("repas-finance-label").value.trim();
+    const montant = parseFloat(document.getElementById("repas-finance-montant").value) || 0;
+    if (!label || !montant) return;
+    addRepasFinanceApi(eventId, type, label, montant);
+  };
+
+  document.querySelectorAll("[data-delete-repas-finance]").forEach(el => {
+    el.onclick = () => { deleteRepasFinanceApi(el.dataset.deleteRepasFinance); };
   });
 }

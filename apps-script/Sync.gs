@@ -50,6 +50,12 @@ function api_getAll(ss, e) {
   const maillots = maillotsSheet ? maillotsSheet.getDataRange().getValues() : [];
   const foodtrucksSheet = ss.getSheetByName("Foodtrucks");
   const foodtrucks = (foodtrucksSheet && canManageFoodtrucks(callerRole)) ? foodtrucksSheet.getDataRange().getValues() : [];
+  const repasMenuSheet = ss.getSheetByName("RepasMenu");
+  const repasMenu = repasMenuSheet ? repasMenuSheet.getDataRange().getValues() : [];
+  const repasPrevuSheet = ss.getSheetByName("RepasPrevu");
+  const repasPrevu = repasPrevuSheet ? repasPrevuSheet.getDataRange().getValues() : [];
+  const repasFinancesSheet = ss.getSheetByName("RepasFinances");
+  const repasFinances = (repasFinancesSheet && canManageRepas(callerRole)) ? repasFinancesSheet.getDataRange().getValues() : [];
 
-  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, gouter, tableMarque, maillots, foodtrucks });
+  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, gouter, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasFinances });
 }
