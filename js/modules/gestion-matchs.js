@@ -582,6 +582,25 @@ function renderRepasSection() {
   html += `</div>`;
   html += `<button class="btn add-btn-primary" id="toggle-add-repas-menu-item">+ Ajouter un plat au menu</button>`;
 
+  html += `<div class="section-h">Tarifs (réutilisable)</div>`;
+  html += `<div class="card">`;
+  if (repasTarifs.length === 0) {
+    html += `<div class="muted">Aucun tarif enregistré pour le moment.</div>`;
+  } else {
+    repasTarifs.forEach(t => {
+      const [id, label, prix] = t;
+      html += `<div class="paiement-row">
+        <span style="color:#e8e8ee; font-weight:600;">${escapeHtml(label)}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color:var(--accent2); font-weight:800;">${fmt(parseFloat(prix) || 0)} €</span>
+          ${iconBtn(ICON_CROSS, "ev-del", `data-delete-repas-tarif="${escapeHtml(id)}"`)}
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  html += `<button class="btn add-btn-primary" id="toggle-add-repas-tarif">+ Ajouter un tarif</button>`;
+
   html += `<div class="section-h">Matchs à domicile</div>`;
   const matches = repasHomeMatches();
   if (matches.length === 0) {
@@ -605,6 +624,7 @@ function renderRepasSection() {
   }
 
   html += renderRepasMenuAddSheet();
+  html += renderRepasTarifAddSheet();
 
   return html;
 }
@@ -624,6 +644,29 @@ function renderRepasMenuAddSheet() {
       <div class="sheet-hero">
         <div class="sheet-hero-eyebrow">Menu</div>
         <h2>Ajouter un plat</h2>
+      </div>
+      <div class="sheet-body">${bodyHtml}</div>
+    </div>
+  </div>`;
+}
+
+function renderRepasTarifAddSheet() {
+  if (!window.__showAddRepasTarif) return "";
+  const bodyHtml = `
+    <label class="field-label">Libellé</label>
+    <input id="repas-tarif-label" type="text" placeholder="Ex: Repas adulte" />
+    <label class="field-label">Prix (€)</label>
+    <input id="repas-tarif-prix" type="number" step="0.5" placeholder="Ex: 8" />
+    <button class="btn" id="repas-tarif-add" style="margin-top:12px;">Ajouter le tarif</button>`;
+
+  return `<div class="sheet-overlay open" data-close-sheet="showAddRepasTarif">
+    <div class="sheet-scrim" data-close-sheet="showAddRepasTarif"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="showAddRepasTarif">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Tarifs</div>
+        <h2>Ajouter un tarif</h2>
       </div>
       <div class="sheet-body">${bodyHtml}</div>
     </div>
@@ -681,6 +724,15 @@ function renderRepasDetailSheet() {
     ${financeRows}
 
     <div class="add-form" style="margin-top:10px;">
+      ${repasTarifs.length > 0 ? `
+      <label class="field-label">Depuis un tarif (optionnel — pré-remplit description et montant)</label>
+      <select id="repas-finance-tarif">
+        <option value="">— Libre —</option>
+        ${repasTarifs.map(t => `<option value="${escapeHtml(t[0])}" data-prix="${parseFloat(t[2]) || 0}" data-label="${escapeHtml(t[1])}">${escapeHtml(t[1])} (${fmt(parseFloat(t[2]) || 0)} €)</option>`).join("")}
+      </select>
+      <label class="field-label">Quantité</label>
+      <input id="repas-finance-qty" type="number" min="1" value="1" />
+      ` : ""}
       <label class="field-label">Type</label>
       <select id="repas-finance-type">
         <option value="depense">Dépense</option>
@@ -734,6 +786,35 @@ async function deleteRepasMenuItemApi(id) {
   render();
   try {
     const params = new URLSearchParams({ action: "deleteRepasMenuItem", id, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    await fetchAll();
+  } catch (err) { isOnline = false; render(); }
+}
+
+async function addRepasTarifApi(label, prix) {
+  const tempId = "temp_" + Date.now();
+  repasTarifs.push([tempId, label, prix]);
+  window.__showAddRepasTarif = false;
+  render();
+  try {
+    const params = new URLSearchParams({ action: "addRepasTarif", label, prix, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) { await fetchAll(); }
+    else { repasTarifs = repasTarifs.filter(r => r[0] !== tempId); showToast("Échec de l'ajout", "error"); render(); }
+  } catch (err) {
+    isOnline = false;
+    repasTarifs = repasTarifs.filter(r => r[0] !== tempId);
+    showToast("Échec de l'ajout", "error");
+    render();
+  }
+}
+
+async function deleteRepasTarifApi(id) {
+  repasTarifs = repasTarifs.filter(r => r[0] !== id); // optimiste
+  render();
+  try {
+    const params = new URLSearchParams({ action: "deleteRepasTarif", id, authNom: session.nom, authCode: session.code });
     await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     await fetchAll();
   } catch (err) { isOnline = false; render(); }
@@ -953,6 +1034,28 @@ function attachGestionMatchsEvents() {
     };
   });
 
+  const toggleAddRepasTarif = document.getElementById("toggle-add-repas-tarif");
+  if (toggleAddRepasTarif) toggleAddRepasTarif.onclick = () => {
+    vibrate();
+    window.__showAddRepasTarif = true;
+    render();
+  };
+
+  const repasTarifAdd = document.getElementById("repas-tarif-add");
+  if (repasTarifAdd) repasTarifAdd.onclick = () => {
+    const label = document.getElementById("repas-tarif-label").value.trim();
+    const prix = parseFloat(document.getElementById("repas-tarif-prix").value) || 0;
+    if (!label || !prix) return;
+    addRepasTarifApi(label, prix);
+  };
+
+  document.querySelectorAll("[data-delete-repas-tarif]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.deleteRepasTarif;
+      if (confirm("Supprimer ce tarif ?")) deleteRepasTarifApi(id);
+    };
+  });
+
   document.querySelectorAll("[data-open-repas-detail]").forEach(el => {
     el.onclick = () => { vibrate(); window.__repasDetailFor = el.dataset.openRepasDetail; render(); };
   });
@@ -964,6 +1067,23 @@ function attachGestionMatchsEvents() {
       setRepasPrevuApi(eventId, menuId, !repasPrevuFor(eventId, menuId));
     };
   });
+
+  // Aide à la saisie d'une recette : choisir un tarif + une quantité pré-remplit la description
+  // et le montant (prix × quantité), sans passer par render() — juste un raccourci de saisie,
+  // les deux champs restent modifiables avant validation.
+  const repasFinanceTarifSelect = document.getElementById("repas-finance-tarif");
+  const repasFinanceQtyInput = document.getElementById("repas-finance-qty");
+  const fillRepasFinanceFromTarif = () => {
+    if (!repasFinanceTarifSelect || !repasFinanceTarifSelect.value) return;
+    const opt = repasFinanceTarifSelect.options[repasFinanceTarifSelect.selectedIndex];
+    const prix = parseFloat(opt.dataset.prix) || 0;
+    const qty = parseInt(repasFinanceQtyInput.value, 10) || 1;
+    document.getElementById("repas-finance-label").value = `${qty} × ${opt.dataset.label}`;
+    document.getElementById("repas-finance-montant").value = (prix * qty).toFixed(2);
+    document.getElementById("repas-finance-type").value = "recette";
+  };
+  if (repasFinanceTarifSelect) repasFinanceTarifSelect.onchange = fillRepasFinanceFromTarif;
+  if (repasFinanceQtyInput) repasFinanceQtyInput.onchange = fillRepasFinanceFromTarif;
 
   const repasFinanceAdd = document.getElementById("repas-finance-add");
   if (repasFinanceAdd) repasFinanceAdd.onclick = () => {

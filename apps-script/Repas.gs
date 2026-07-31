@@ -1,9 +1,14 @@
 // ===================================================================
 // REPAS D'APRÈS-MATCH — remplace le suivi des foodtrucks (page Gestion
-// des matchs, voir gestion-matchs.js). Trois feuilles :
+// des matchs, voir gestion-matchs.js). Quatre feuilles :
 //  - RepasMenu : liste de plats réutilisable d'un match à l'autre.
 //  - RepasPrevu : quels plats du menu sont prévus pour un match donné
 //    (une ligne par plat coché).
+//  - RepasTarifs : liste de tarifs réutilisable (ex: "Repas adulte" =
+//    8€) — sert d'aide à la saisie d'une recette (voir le sélecteur de
+//    tarif + quantité dans la fiche finances), reste une aide, pas un
+//    calcul individuel stocké : seule la ligne agrégée (montant total)
+//    finit dans RepasFinances.
 //  - RepasFinances : dépenses/recettes de l'organisation d'un match
 //    (pas de coût par plat individuel) — le rendement (recette - dépense)
 //    est calculé côté appli, pas stocké.
@@ -27,6 +32,14 @@ function setupRepas() {
     prevuSheet.getRange(1, 1, 1, 2).setValues([["EventID", "MenuID"]]);
     prevuSheet.getRange(1, 1, 1, 2).setFontWeight("bold");
     prevuSheet.setFrozenRows(1);
+  }
+
+  let tarifsSheet = ss.getSheetByName("RepasTarifs");
+  if (!tarifsSheet) tarifsSheet = ss.insertSheet("RepasTarifs");
+  if (tarifsSheet.getDataRange().getNumRows() <= 1) {
+    tarifsSheet.getRange(1, 1, 1, 3).setValues([["ID", "Label", "Prix"]]);
+    tarifsSheet.getRange(1, 1, 1, 3).setFontWeight("bold");
+    tarifsSheet.setFrozenRows(1);
   }
 
   let financesSheet = ss.getSheetByName("RepasFinances");
@@ -57,6 +70,28 @@ function api_deleteRepasMenuItem(ss, e) {
   const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
   if (!role || !canManageRepas(role)) return jsonOut({ ok: false, error: "forbidden" });
   const sheet = ss.getSheetByName("RepasMenu");
+  const data = sheet.getDataRange().getValues();
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0] === e.parameter.id) sheet.deleteRow(i + 1);
+  }
+  return jsonOut({ ok: true });
+}
+
+// ===================== TARIFS (réutilisable) =====================
+
+function api_addRepasTarif(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!role || !canManageRepas(role)) return jsonOut({ ok: false, error: "forbidden" });
+  const sheet = ss.getSheetByName("RepasTarifs");
+  const id = Utilities.getUuid();
+  sheet.appendRow([id, e.parameter.label || "", e.parameter.prix || "0"]);
+  return jsonOut({ ok: true, id });
+}
+
+function api_deleteRepasTarif(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!role || !canManageRepas(role)) return jsonOut({ ok: false, error: "forbidden" });
+  const sheet = ss.getSheetByName("RepasTarifs");
   const data = sheet.getDataRange().getValues();
   for (let i = data.length - 1; i >= 1; i--) {
     if (data[i][0] === e.parameter.id) sheet.deleteRow(i + 1);

@@ -8,7 +8,7 @@ const LOGO_DATA_URI = "images/icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-07-31-13"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-07-31-14"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -32,6 +32,7 @@ let maillots = []; // [[eventId, nom, pris], ...] (+ header row)
 let foodtrucks = []; // [[id, eventId, nom, prix, benefice, notes], ...] (+ header row)
 let repasMenu = []; // [[id, nom], ...] (+ header row) — menu réutilisable du repas d'après-match
 let repasPrevu = []; // [[eventId, menuId], ...] (+ header row) — plats prévus pour un match donné
+let repasTarifs = []; // [[id, label, prix], ...] (+ header row) — aide à la saisie d'une recette
 let repasFinances = []; // [[id, eventId, type("depense"/"recette"), label, montant], ...] (+ header row)
 
 let session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");

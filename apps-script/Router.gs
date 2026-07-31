@@ -55,6 +55,8 @@ const API_HANDLERS = {
   deleteFoodtruck: api_deleteFoodtruck,                     // Foodtrucks.gs
   addRepasMenuItem: api_addRepasMenuItem,                   // Repas.gs
   deleteRepasMenuItem: api_deleteRepasMenuItem,             // Repas.gs
+  addRepasTarif: api_addRepasTarif,                         // Repas.gs
+  deleteRepasTarif: api_deleteRepasTarif,                   // Repas.gs
   setRepasPrevu: api_setRepasPrevu,                         // Repas.gs
   addRepasFinance: api_addRepasFinance,                     // Repas.gs
   deleteRepasFinance: api_deleteRepasFinance,               // Repas.gs

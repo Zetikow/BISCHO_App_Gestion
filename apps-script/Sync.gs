@@ -54,8 +54,10 @@ function api_getAll(ss, e) {
   const repasMenu = repasMenuSheet ? repasMenuSheet.getDataRange().getValues() : [];
   const repasPrevuSheet = ss.getSheetByName("RepasPrevu");
   const repasPrevu = repasPrevuSheet ? repasPrevuSheet.getDataRange().getValues() : [];
+  const repasTarifsSheet = ss.getSheetByName("RepasTarifs");
+  const repasTarifs = repasTarifsSheet ? repasTarifsSheet.getDataRange().getValues() : [];
   const repasFinancesSheet = ss.getSheetByName("RepasFinances");
   const repasFinances = (repasFinancesSheet && canManageRepas(callerRole)) ? repasFinancesSheet.getDataRange().getValues() : [];
 
-  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, gouter, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasFinances });
+  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, gouter, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasTarifs, repasFinances });
 }
