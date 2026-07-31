@@ -23,10 +23,11 @@ function canManageFoodtrucks() {
   return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
 }
 
-// SM1 ne gère pas le goûter/la table de marque/les maillots/les foodtrucks — seul le
-// covoiturage les concerne (demande club, ne s'applique pas aux autres équipes).
+// SM1 et SM2 ne gèrent pas le goûter/la table de marque/les maillots/les foodtrucks — seul
+// le covoiturage les concerne (demande club, ne s'applique pas à U17M1).
 const GESTION_MATCHS_TEAM_EXCLUDED_SECTIONS = {
   SM1: ["gouter", "tablemarque", "maillots", "foodtruck"],
+  SM2: ["gouter", "tablemarque", "maillots", "foodtruck"],
 };
 
 function gestionMatchsSectionsForRole(activeTeam) {
@@ -34,9 +35,6 @@ function gestionMatchsSectionsForRole(activeTeam) {
   return GESTION_MATCHS_SECTIONS.filter(s => (s.id !== "foodtruck" || canManageFoodtrucks()) && !excluded.includes(s.id));
 }
 
-// Nombre de sections affichées directement (les plus utilisées) avant de basculer les
-// suivantes dans le menu "⋮" — sur mobile, plus que ça fait déborder/couper les mots.
-const GESTION_MATCHS_VISIBLE_COUNT = 3;
 const GESTION_MATCHS_USAGE_KEY = "bischo-gestion-matchs-usage";
 
 // Fréquence d'usage par section, propre à cet appareil (localStorage) — pas de notion de
@@ -472,19 +470,9 @@ function renderGestionMatchsPage() {
   const section = sortedSections.some(s => s.id === window.__gestionMatchsSection) ? window.__gestionMatchsSection : (sortedSections[0] ? sortedSections[0].id : "covoiturage");
   const needsTeam = section !== "foodtruck"; // les foodtrucks ne concernent aucune équipe en particulier
 
-  const visibleSections = sortedSections.slice(0, GESTION_MATCHS_VISIBLE_COUNT);
-  const overflowSections = sortedSections.slice(GESTION_MATCHS_VISIBLE_COUNT);
-  const activeInOverflow = overflowSections.some(s => s.id === section);
-
   let html = `<div class="page-title">Gestion des matchs</div><div class="page-sub">Covoiturage, goûter, table de marque et maillots${needsTeam ? " — équipe " + escapeHtml(activeTeam) : ""}</div>`;
-  html += `<div class="mode-tabs">
-    ${visibleSections.map(s => `<button type="button" class="mode-tab-btn ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</button>`).join("")}
-    ${overflowSections.length > 0 ? `<div class="gm-extra-wrap">
-      <button type="button" class="mode-tab-btn gm-extra-trigger ${activeInOverflow ? 'active' : ''}" id="gm-extra-trigger">⋮</button>
-      ${window.__gestionMatchsExtraOpen ? `<div class="avatar-menu gm-extra-menu">
-        ${overflowSections.map(s => `<div class="avatar-menu-item ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</div>`).join("")}
-      </div>` : ""}
-    </div>` : ""}
+  html += `<div class="gm-section-grid">
+    ${sortedSections.map(s => `<button type="button" class="gm-section-chip ${section === s.id ? 'active' : ''}" data-gestion-matchs-section="${s.id}">${s.label}</button>`).join("")}
   </div>`;
   if (needsTeam) html += renderTeamSwitcher(teams, activeTeam, "covoit-team");
 
@@ -580,18 +568,9 @@ function attachGestionMatchsEvents() {
       const id = el.dataset.gestionMatchsSection;
       window.__gestionMatchsSection = id;
       bumpGestionMatchsUsage(id);
-      window.__gestionMatchsExtraOpen = false;
       render();
     };
   });
-
-  const gmExtraTrigger = document.getElementById("gm-extra-trigger");
-  if (gmExtraTrigger) gmExtraTrigger.onclick = (e) => {
-    e.stopPropagation();
-    vibrate();
-    window.__gestionMatchsExtraOpen = !window.__gestionMatchsExtraOpen;
-    render();
-  };
 
   document.querySelectorAll("[data-covoit-team]").forEach(el => {
     el.onclick = () => { vibrate(); window.__covoitTeamView = el.dataset.covoitTeam; render(); };

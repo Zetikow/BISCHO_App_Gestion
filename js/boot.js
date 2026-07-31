@@ -26,10 +26,6 @@ document.addEventListener("click", (e) => {
     window.__evMenuOpen = null;
     render();
   }
-  if (window.__gestionMatchsExtraOpen && !e.target.closest(".gm-extra-wrap")) {
-    window.__gestionMatchsExtraOpen = false;
-    render();
-  }
 });
 
 async function fetchLoginNoms(retriesLeft = 2) {
