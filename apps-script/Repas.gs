@@ -141,3 +141,39 @@ function api_deleteRepasFinance(ss, e) {
   }
   return jsonOut({ ok: true });
 }
+
+// ===================== ANNONCE (actualité + mail) =====================
+// Publie une actualité générale pour mettre en avant le repas d'après-match d'un match donné,
+// et envoie un mail à tous les comptes ayant une adresse renseignée. Déclenché manuellement
+// (bouton "Publier une actualité" dans la fiche du match), jamais automatiquement à chaque
+// coche d'un plat — sinon un mail partirait à chaque modification du menu prévu.
+// Attention quotas Gmail/Apps Script (~100 mails/jour sur un compte Gmail standard, plus sur
+// Workspace) : à surveiller si le club grandit ou si plusieurs annonces partent le même jour.
+function api_publishRepasActualite(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!role || !canManageRepas(role)) return jsonOut({ ok: false, error: "forbidden" });
+
+  const titre = e.parameter.titre || "Repas d'après-match";
+  const texte = e.parameter.texte || "";
+
+  const actualitesSheet = ss.getSheetByName("Actualites");
+  const actId = "a" + Date.now();
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  actualitesSheet.appendRow([actId, titre, "Générale", texte, e.parameter.authNom, now]);
+
+  const comptesSheet = ss.getSheetByName("Comptes");
+  const comptes = comptesSheet.getDataRange().getValues();
+  let sent = 0;
+  for (let i = 1; i < comptes.length; i++) {
+    const email = comptes[i][COL_EMAIL];
+    if (!email) continue;
+    try {
+      MailApp.sendEmail(email, titre, texte + "\n\nRetrouve toutes les infos sur LustuZone.", { name: CLUB_NAME });
+      sent++;
+    } catch (err) {
+      Logger.log("Erreur envoi mail annonce repas à " + comptes[i][COL_NOM] + " : " + err);
+    }
+  }
+
+  return jsonOut({ ok: true, sent });
+}

@@ -719,6 +719,7 @@ function renderRepasDetailSheet() {
 
     <div class="section-h">Ce qui est prévu</div>
     ${menuHtml}
+    <button type="button" class="btn secondary" style="margin-top:4px;" data-publish-repas-actu="${escapeHtml(eventId)}">📣 Publier une actualité (+ mail à tous)</button>
 
     <div class="section-h">Finances</div>
     ${financeRows}
@@ -858,6 +859,23 @@ async function deleteRepasFinanceApi(id) {
     await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     await fetchAll();
   } catch (err) { isOnline = false; render(); }
+}
+
+async function publishRepasActualiteApi(eventId, titre, texte) {
+  try {
+    const params = new URLSearchParams({ action: "publishRepasActualite", eventId, titre, texte, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`Actualité publiée, mail envoyé à ${data.sent} personne${data.sent > 1 ? "s" : ""}`, "success");
+      await fetchAll();
+    } else {
+      showToast("Échec de la publication", "error");
+    }
+  } catch (err) {
+    isOnline = false;
+    showToast("Échec de la publication", "error");
+  }
 }
 
 // Historique du covoiturage (matchs passés) pour une personne donnée — utilisé notamment sur
@@ -1097,5 +1115,22 @@ function attachGestionMatchsEvents() {
 
   document.querySelectorAll("[data-delete-repas-finance]").forEach(el => {
     el.onclick = () => { deleteRepasFinanceApi(el.dataset.deleteRepasFinance); };
+  });
+
+  document.querySelectorAll("[data-publish-repas-actu]").forEach(el => {
+    el.onclick = () => {
+      const eventId = el.dataset.publishRepasActu;
+      const ev = evenements.find(e => e[0] === eventId);
+      const displayTitre = ev ? (formatMatchDisplay(ev[4], ev[5]).label || ev[4] || "Match") : "Match";
+      const dateLabel = ev ? formatEventDateFr(ev) : "";
+      const prevuNames = repasMenu.filter(m => repasPrevuFor(eventId, m[0])).map(m => m[1]);
+      const titre = "Repas d'après-match — " + displayTitre;
+      const texte = prevuNames.length > 0
+        ? `Au menu pour le repas après ${displayTitre}${dateLabel ? " (" + dateLabel + ")" : ""} : ${prevuNames.join(", ")}. À vos fourchettes !`
+        : `Un repas est prévu après ${displayTitre}${dateLabel ? " (" + dateLabel + ")" : ""}. Plus de détails à venir !`;
+      if (confirm(`Publier cette actualité et envoyer un mail à tous les comptes ?\n\n"${titre}"\n${texte}`)) {
+        publishRepasActualiteApi(eventId, titre, texte);
+      }
+    };
   });
 }

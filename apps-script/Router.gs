@@ -60,6 +60,7 @@ const API_HANDLERS = {
   setRepasPrevu: api_setRepasPrevu,                         // Repas.gs
   addRepasFinance: api_addRepasFinance,                     // Repas.gs
   deleteRepasFinance: api_deleteRepasFinance,               // Repas.gs
+  publishRepasActualite: api_publishRepasActualite,         // Repas.gs
 };
 
 // Toute action passe par ce try/catch : sans lui, une erreur non prévue dans un handler (ex:
