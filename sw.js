@@ -1,7 +1,7 @@
 // IMPORTANT : incrémente ce numéro à chaque mise à jour déployée de l'appli.
 // Ça force le renouvellement du cache ET (via APP_VERSION dans index.html)
 // la déconnexion de tous les utilisateurs pour qu'ils rechargent la dernière version.
-const CACHE_NAME = "caisse-noire-v2026-08-01-3";
+const CACHE_NAME = "caisse-noire-v2026-08-01-4";
 const ASSETS = [
   "./manifest.json",
   "./images/icon-192.png",
@@ -18,12 +18,12 @@ importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"
 importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "AIzaSyCU2E4cu55ZoAAS4MkGCsm8-2MjOlE-NuI",
-  authDomain: "lustuzone.firebaseapp.com",
-  projectId: "lustuzone",
-  storageBucket: "lustuzone.firebasestorage.app",
-  messagingSenderId: "1007511435940",
-  appId: "1:1007511435940:web:73de2b7d7259e9ed554431",
+  apiKey: "AIzaSyD2x5SnYT5bz_niQkUMAL_H-DwxajuRTJA",
+  authDomain: "appgestionlustuzone.firebaseapp.com",
+  projectId: "appgestionlustuzone",
+  storageBucket: "appgestionlustuzone.firebasestorage.app",
+  messagingSenderId: "746274171647",
+  appId: "1:746274171647:web:01659a3777cbd8ec503aca",
 });
 
 const messaging = firebase.messaging();

@@ -14,12 +14,12 @@
 // ===================================================================
 
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCU2E4cu55ZoAAS4MkGCsm8-2MjOlE-NuI",
-  authDomain: "lustuzone.firebaseapp.com",
-  projectId: "lustuzone",
-  storageBucket: "lustuzone.firebasestorage.app",
-  messagingSenderId: "1007511435940",
-  appId: "1:1007511435940:web:73de2b7d7259e9ed554431",
+  apiKey: "AIzaSyD2x5SnYT5bz_niQkUMAL_H-DwxajuRTJA",
+  authDomain: "appgestionlustuzone.firebaseapp.com",
+  projectId: "appgestionlustuzone",
+  storageBucket: "appgestionlustuzone.firebasestorage.app",
+  messagingSenderId: "746274171647",
+  appId: "1:746274171647:web:01659a3777cbd8ec503aca",
 };
 
-const FCM_VAPID_KEY = "BBx9U5og9l94xmZHjW4DpVvBOJcVPNeM9O0rWC7QzXfps4tMCtpti1sIJBMo0EEI_NpXFxMO8dPpuFSI62RwtSs";
+const FCM_VAPID_KEY = "BFlMvQ62zLZt6LmgmOd_L8k50iLL0aToPbUl_hcsd9TWiIiFofN4Ebyk5Rr0qcBo40WZxHdrriTs9rupAU-DHys";

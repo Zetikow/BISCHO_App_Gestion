@@ -10,7 +10,7 @@
 // Configuration nécessaire — PAS dans ce fichier, dans les Propriétés
 // du script (Apps Script > ⚙️ Paramètres du projet > Propriétés du
 // script > Ajouter une propriété du script) :
-//   FCM_PROJECT_ID    : "lustuzone" (l'ID du projet Firebase)
+//   FCM_PROJECT_ID    : "appgestionlustuzone" (l'ID du projet Firebase)
 //   FCM_CLIENT_EMAIL  : le champ "client_email" du fichier .json du
 //                       compte de service (Firebase > Paramètres du
 //                       projet > Comptes de service > Générer une
