@@ -158,16 +158,28 @@ tr.total-row td { font-weight: 800; background: #1a1710; color: #ffd23f; }
 .toggle-btn.present { background: #1a7a3f; color: #fff; border-color: #1a7a3f; }
 .toggle-btn.absent { background: #b33; color: #fff; border-color: #b33; }
 
+/* Même principe que #app::before : le flou vit dans un pseudo-élément séparé du contenu (la
+   carte de connexion), pas sur .login-wrap directement. */
 .login-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 85vh;
   padding: 16px;
+  position: relative;
+  z-index: 1;
+}
+.login-wrap::before {
+  content: "";
+  position: absolute;
+  top: -14px; left: -14px; right: -14px; bottom: -14px;
+  z-index: -1;
   background-image: linear-gradient(180deg, rgba(7,8,13,0.28), rgba(7,8,13,0.42)), url('../images/bg-app.jpg');
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
+  filter: blur(9px);
+  pointer-events: none;
 }
 .login-card-outer { border-radius: 26px; padding: 2px; background: var(--grad); width: 100%; }
 @media (min-width: 700px) {
