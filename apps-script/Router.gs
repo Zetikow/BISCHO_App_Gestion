@@ -14,6 +14,7 @@ const API_HANDLERS = {
   listNoms: api_listNoms,                                   // Auth.gs
   setPoste: api_setPoste,                                   // Auth.gs
   setEmail: api_setEmail,                                   // Auth.gs
+  setPushToken: api_setPushToken,                           // Auth.gs
   login: api_login,                                         // Auth.gs
   notifyPaymentClaim: api_notifyPaymentClaim,               // Paiements.gs
   addPaiement: api_addPaiement,                             // Paiements.gs

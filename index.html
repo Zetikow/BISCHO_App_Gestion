@@ -20,14 +20,22 @@
 <div id="app">Chargement...</div>
 
 <script src="config/google-script-config.js"></script>
+<script src="config/firebase-config.js"></script>
 
 <!-- Config propre au club : à éditer pour un autre club/asso (barème, effectif, salle, liens) -->
 <script src="js/config/club-config.js"></script>
+
+<!-- SDK Firebase (notifications push) — version "compat" (expose window.firebase), pas de build
+     step dans ce projet donc pas d'import ES module. Chargé depuis gstatic.com, déjà exclu du
+     cache-first de sw.js (voir son gestionnaire "fetch"). -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
 <!-- Core : état partagé, utilitaires, sync serveur, rendu principal, câblage des événements -->
 <script src="js/core/state.js"></script>
 <script src="js/core/utils.js"></script>
 <script src="js/core/api.js"></script>
+<script src="js/core/push.js"></script>
 
 <!-- Modules métier : un fichier par fonctionnalité, à retirer librement pour un autre club -->
 <script src="js/modules/caisse-noire.js"></script>

@@ -604,6 +604,7 @@ function render() {
         <div class="avatar-menu-name">${session.nom}</div>
         <div class="badge avatar-menu-role">${rolesLabel()}</div>
         <div class="avatar-menu-item" id="menu-profil">Mon profil</div>
+        <div class="avatar-menu-item" id="menu-enable-push">🔔 Activer les notifications</div>
         <div class="avatar-menu-item" id="menu-guide">📖 Consignes d'utilisation</div>
         <div class="avatar-menu-item" id="menu-support">💬 Support / une question ?</div>
         <a class="avatar-menu-item" href="${CLUB_WEBSITE_URL}" target="_blank" rel="noopener" style="display:block; text-decoration:none; box-sizing:border-box;">🌐 Site du club</a>

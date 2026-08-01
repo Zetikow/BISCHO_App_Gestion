@@ -90,6 +90,14 @@ function attachCoreNavEvents() {
     render();
   };
 
+  const menuEnablePush = document.getElementById("menu-enable-push");
+  if (menuEnablePush) menuEnablePush.onclick = () => {
+    vibrate();
+    window.__avatarMenuOpen = false;
+    render();
+    enablePushNotifications();
+  };
+
   const menuGuide = document.getElementById("menu-guide");
   if (menuGuide) menuGuide.onclick = () => {
     window.__avatarMenuOpen = false;

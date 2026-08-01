@@ -1,13 +1,57 @@
 // IMPORTANT : incrémente ce numéro à chaque mise à jour déployée de l'appli.
 // Ça force le renouvellement du cache ET (via APP_VERSION dans index.html)
 // la déconnexion de tous les utilisateurs pour qu'ils rechargent la dernière version.
-const CACHE_NAME = "caisse-noire-v2026-08-01-2";
+const CACHE_NAME = "caisse-noire-v2026-08-01-3";
 const ASSETS = [
   "./manifest.json",
   "./images/icon-192.png",
   "./images/icon-512.png",
   "./images/bg-app.jpg"
 ];
+
+// ===== Notifications push (Firebase Cloud Messaging) =====
+// Intégré ici plutôt que dans un fichier "firebase-messaging-sw.js" séparé : un seul service
+// worker peut contrôler la page à la fois, et celui-ci gère déjà le cache/offline. Même
+// firebaseConfig que config/firebase-config.js — un service worker ne peut pas importer les
+// fichiers JS de la page principale, doit être dupliqué ici si le projet Firebase change.
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js");
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCU2E4cu55ZoAAS4MkGCsm8-2MjOlE-NuI",
+  authDomain: "lustuzone.firebaseapp.com",
+  projectId: "lustuzone",
+  storageBucket: "lustuzone.firebasestorage.app",
+  messagingSenderId: "1007511435940",
+  appId: "1:1007511435940:web:73de2b7d7259e9ed554431",
+});
+
+const messaging = firebase.messaging();
+
+// Notification reçue alors que l'appli est fermée ou en arrière-plan (celles reçues appli
+// ouverte au premier plan passent par messaging.onMessage() côté page, voir js/core/push.js).
+messaging.onBackgroundMessage((payload) => {
+  const title = (payload.notification && payload.notification.title) || "LustuZone";
+  const options = {
+    body: (payload.notification && payload.notification.body) || "",
+    icon: "images/icon-192.png",
+    badge: "images/icon-192.png",
+  };
+  self.registration.showNotification(title, options);
+});
+
+// Clic sur une notification : ramène l'onglet déjà ouvert au premier plan, ou en ouvre un nouveau.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow("./");
+    })
+  );
+});
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
