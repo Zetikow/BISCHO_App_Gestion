@@ -133,3 +133,29 @@ function testPushNotification() {
   }
   Logger.log("Aucun compte n'a encore de jeton push enregistré — active d'abord les notifications depuis l'appli (menu avatar > 🔔 Activer les notifications).");
 }
+
+// À exécuter manuellement pour tester l'envoi à une personne précise plutôt qu'au premier compte
+// trouvé — change nomCible ci-dessous (nom exact tel qu'il apparaît dans la colonne Nom de
+// Comptes), puis Exécuter. Cette personne doit avoir déjà activé les notifications sur son
+// appareil (menu avatar > 🔔 Activer les notifications), sinon elle n'a pas encore de jeton.
+function testPushToPerson() {
+  const nomCible = "Nom Exact"; // <-- change ici avant de lancer
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Comptes");
+  ensureComptesSchema(sheet);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][COL_NOM]).trim() === nomCible) {
+      const token = data[i][COL_PUSHSUBIDS];
+      if (!token) {
+        Logger.log(nomCible + " n'a pas encore activé les notifications (menu avatar > 🔔 Activer les notifications).");
+        return;
+      }
+      const ok = sendPushNotification(token, "Test LustuZone", "Ceci est un test envoyé spécifiquement à toi !");
+      Logger.log(ok ? "Notification envoyée avec succès à " + nomCible + "." : "Échec de l'envoi à " + nomCible + " — voir les lignes ci-dessus pour le détail.");
+      return;
+    }
+  }
+  Logger.log("Compte introuvable : " + nomCible);
+}
