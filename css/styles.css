@@ -42,10 +42,12 @@ body {
   position: absolute;
   top: -14px; left: -14px; right: -14px; bottom: -14px;
   z-index: -1;
+  /* 2 couches : le dégradé de contraste (jamais répété, sinon il recommence plus clair à chaque
+     tuile et ça crée une ligne visible) + la photo qui, elle, se répète verticalement (repeat-y). */
   background-image: linear-gradient(180deg, rgba(7,8,13,0.28), rgba(7,8,13,0.42)), url('../images/bg-app.jpg');
-  background-size: 100% auto;
-  background-position: top center;
-  background-repeat: repeat-y;
+  background-size: 100% 100%, 100% auto;
+  background-position: top center, top center;
+  background-repeat: no-repeat, repeat-y;
   filter: blur(9px);
   pointer-events: none;
 }
