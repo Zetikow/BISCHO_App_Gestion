@@ -220,9 +220,11 @@ function renderPresencePage() {
   return html;
 }
 
-// ===================== SÉLECTION MATCH (SM1 en premier lieu) =====================
+// ===================== SÉLECTION MATCH (toutes équipes) =====================
 // Distinct de la présence : qui est retenu dans les 12 pour le match, pas juste disponible.
-// Réservé Coach/Admin (voir canManage dans renderPresencePage) — feuille "Selections".
+// Réservé Coach/Admin (voir canManage dans renderPresencePage) — feuille "Selections". Fonctionne
+// pour n'importe quelle équipe (activeTeam, le même sélecteur que la sous-vue Présence) : rien
+// dans le code n'est spécifique à une équipe en particulier.
 
 function selectionEntryFor(eventId, nom) {
   return selections.find(r => r[0] === eventId && r[1] === nom) || null;

@@ -1,9 +1,10 @@
 // ===================================================================
-// SÉLECTION MATCH — qui est retenu pour un match donné (SM1 en premier
-// lieu), distinct de la simple présence : une ligne par (événement,
-// personne). Réservé Coach/Admin. Sert de base au suivi du brûlage SM1
-// (voir composition.js / profil.js) tant qu'il n'existe pas de feuille
-// de composition publiée pour cette équipe. feuille "Selections".
+// SÉLECTION MATCH — qui est retenu pour un match donné, distinct de la
+// simple présence : une ligne par (événement, personne). Réservé
+// Coach/Admin, fonctionne pour n'importe quelle équipe. Sert aussi de
+// base au suivi du brûlage SM1 (voir composition.js / profil.js) tant
+// qu'il n'existe pas de feuille de composition publiée pour cette
+// équipe. feuille "Selections".
 // ===================================================================
 
 function setupSelections() {
