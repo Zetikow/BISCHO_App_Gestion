@@ -3,6 +3,17 @@
 // noire (playerTotal/resteAPayer) pour la carte "cotisation restante".
 // ===================================================================
 
+// La date d'un paiement revient parfois de Google Sheets en horodatage ISO complet (Sheets
+// convertit silencieusement une saisie "date" en vraie Date, sérialisée en ISO au sync) plutôt
+// qu'en simple "YYYY-MM-DD" — new Date() parse les deux formats, et toLocaleDateString() re-
+// convertit l'instant UTC vers l'heure locale du navigateur, ce qui restitue la bonne date.
+function formatPaiementDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function renderPaiementsPage() {
   const isPlayer = PLAYERS.map(p => p.trim()).includes((session.nom || "").trim());
   let html = `<div class="page-title">Paiements</div><div class="page-sub">${hasRole("Admin") ? "Suivi de la trésorerie." : "Ta cotisation."}</div>`;
@@ -89,10 +100,13 @@ function renderPaiementsPage() {
           </div>
         </div>`;
       } else {
-        html += `<div class="paiement-row">
-          <div>${joueur} ${commentaire ? `<span class="muted">(${commentaire})</span>` : ""}</div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="muted">${fmt(parseFloat(montant))} € · ${date}</span>
+        html += `<div class="paiement-row" style="align-items:flex-start;">
+          <div style="min-width:0;">
+            <div style="font-weight:700; color:#e8e8ee;">${joueur}</div>
+            <div class="muted" style="font-size:11px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${commentaire ? escapeHtml(commentaire) + " · " : ""}${formatPaiementDate(date)}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span style="color:#78c850; font-weight:800; font-size:14px;">${fmt(parseFloat(montant))} €</span>
             ${iconBtn(ICON_EDIT, "ev-edit", `data-edit-paiement="${id}"`)}
             ${iconBtn(ICON_CROSS, "ev-del", `data-delete-paiement="${id}"`)}
           </div>
