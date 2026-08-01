@@ -40,7 +40,10 @@ body {
 #app::before {
   content: "";
   position: absolute;
-  top: -14px; left: -14px; right: -14px; bottom: -14px;
+  /* Le flou (9px) déborde visuellement d'environ 3x son rayon (~27px) : avec seulement -14px de
+     débord, ce halo de flou n'avait pas assez d'image en dehors des bords pour se fondre et
+     ressortait comme une brume plus prononcée sur les côtés. -40px laisse la marge nécessaire. */
+  top: -40px; left: -40px; right: -40px; bottom: -40px;
   z-index: -1;
   /* 2 couches : le dégradé de contraste (jamais répété, sinon il recommence plus clair à chaque
      tuile et ça crée une ligne visible) + la photo qui, elle, se répète verticalement (repeat-y). */
@@ -174,7 +177,9 @@ tr.total-row td { font-weight: 800; background: #1a1710; color: #ffd23f; }
 .login-wrap::before {
   content: "";
   position: absolute;
-  top: -14px; left: -14px; right: -14px; bottom: -14px;
+  /* Même correctif que #app::before : -40px de débord pour que le flou (9px, ~27px de portée
+     visuelle) ait assez d'image hors-cadre et ne ressorte pas en brume plus marquée sur les bords. */
+  top: -40px; left: -40px; right: -40px; bottom: -40px;
   z-index: -1;
   background-image: linear-gradient(180deg, rgba(7,8,13,0.28), rgba(7,8,13,0.42)), url('../images/bg-app.jpg');
   background-size: cover;
