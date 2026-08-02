@@ -224,6 +224,16 @@ function renderProfilPage() {
     if (parentRole) html += renderCovoiturageHistoryCard(presenceNom);
   }
 
+  // Accès direct Admin à la page de réservation ostéo externe (compte séparé, hors LustuZone) —
+  // pratique pour tester ou envoyer le lien à Eve sans avoir à le retrouver ailleurs.
+  if (hasRole("Admin")) {
+    html += `<div class="card">
+      <div class="section-h">Réservation Ostéo (externe)</div>
+      <div class="muted" style="margin-bottom:10px;">Page séparée, sans identité LustuZone, pour les personnes externes au club que l'ostéo connaît.</div>
+      <a href="osteo-externe.html" target="_blank" rel="noopener" class="sheet-cta" style="text-decoration:none;">Ouvrir la page</a>
+    </div>`;
+  }
+
   return html;
 }
 
