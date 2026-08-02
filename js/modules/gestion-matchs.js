@@ -72,8 +72,19 @@ function gestionMatchsSectionsSorted(activeTeam) {
 function covoitEntryFor(eventId, nom) {
   return covoiturage.find(r => r[0] === eventId && r[1] === nom) || null;
 }
-function gouterEntryFor(eventId, nom) {
-  return gouter.find(r => r[0] === eventId && r[1] === nom) || null;
+// Goûter façon "apero" : liste de choix extensible par match (voir gouterOptionsFor), chaque
+// personne coche ce qu'elle apporte — une ligne par item coché (gouterSignupsFor), remplace
+// l'ancien champ texte libre unique par personne.
+function gouterOptionsFor(eventId) {
+  const row = gouterOptions.find(r => r[0] === eventId);
+  if (!row) return [];
+  try { return JSON.parse(row[1] || "[]"); } catch (err) { return []; }
+}
+function gouterSignupsFor(eventId) {
+  return gouter.filter(r => r[0] === eventId);
+}
+function gouterHasItem(eventId, nom, item) {
+  return gouter.some(r => r[0] === eventId && r[1] === nom && r[2] === item);
 }
 function tableMarqueEntryFor(eventId, nom) {
   return tableMarque.find(r => r[0] === eventId && r[1] === nom) || null;
@@ -97,17 +108,42 @@ async function setCovoiturageApi(nom, eventId, jeConduit, places, besoinPlace) {
   } catch (err) { isOnline = false; render(); }
 }
 
-async function setGouterApi(nom, eventId, quoi) {
-  const existing = gouterEntryFor(eventId, nom);
-  if (quoi) {
-    if (existing) existing[2] = quoi; else gouter.push([eventId, nom, quoi]);
-  } else if (existing) {
-    gouter = gouter.filter(r => r !== existing);
+async function setGouterItemApi(nom, eventId, item, checked) {
+  const already = gouterHasItem(eventId, nom, item);
+  if (checked && !already) gouter.push([eventId, nom, item]);
+  else if (!checked && already) gouter = gouter.filter(r => !(r[0] === eventId && r[1] === nom && r[2] === item));
+  render();
+  try {
+    const params = new URLSearchParams({ action: "setGouter", nom, eventId, item, valeur: checked ? "Oui" : "", authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+  } catch (err) { isOnline = false; render(); }
+}
+
+async function addGouterOptionApi(eventId, option) {
+  const row = gouterOptions.find(r => r[0] === eventId);
+  if (row) {
+    const opts = gouterOptionsFor(eventId);
+    if (opts.indexOf(option) === -1) { opts.push(option); row[1] = JSON.stringify(opts); }
+  } else {
+    gouterOptions.push([eventId, JSON.stringify([option])]);
   }
   render();
   try {
-    const params = new URLSearchParams({ action: "setGouter", nom, eventId, quoi, authNom: session.nom, authCode: session.code });
+    const params = new URLSearchParams({ action: "addGouterOption", eventId, option, authNom: session.nom, authCode: session.code });
     await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    await fetchAll();
+  } catch (err) { isOnline = false; render(); }
+}
+
+async function removeGouterOptionApi(eventId, option) {
+  if (!confirm(`Retirer "${option}" de la liste ?`)) return;
+  const row = gouterOptions.find(r => r[0] === eventId);
+  if (row) row[1] = JSON.stringify(gouterOptionsFor(eventId).filter(o => o !== option));
+  render();
+  try {
+    const params = new URLSearchParams({ action: "removeGouterOption", eventId, option, authNom: session.nom, authCode: session.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    await fetchAll();
   } catch (err) { isOnline = false; render(); }
 }
 
@@ -188,8 +224,8 @@ function renderGestionMatchsDetailSheet() {
       ${needers.length === 0 ? emptyRow : needers.map(r => personRow(r[1])).join("")}`;
   } else if (section === "gouter") {
     sectionLabel = "Goûter";
-    const entries = gouter.filter(r => r[0] === matchId);
-    bodyHtml = `<div class="cp-col-h" style="color:#c98cf0;">🍪 Apportent quelque chose (${entries.length})</div>
+    const entries = gouterSignupsFor(matchId);
+    bodyHtml = `<div class="cp-col-h" style="color:#c98cf0;">🍪 Choses apportées (${entries.length})</div>
       ${entries.length === 0 ? emptyRow : entries.map(r => personRow(r[1], r[2])).join("")}`;
   } else if (section === "tablemarque") {
     sectionLabel = "Table de marque";
@@ -266,23 +302,39 @@ function renderGouterSection(activeTeam) {
   const matches = gestionMatchsUpcoming(activeTeam, "home");
   if (matches.length === 0) return `<div class="card"><div class="muted">Aucun match à domicile à venir pour cette équipe.</div></div>`;
   const identities = myCarpoolIdentitiesForTeam(activeTeam);
+  const isAdmin = hasRole("Admin");
   let html = "";
   matches.forEach(ev => {
     const id = ev[0];
-    const entries = gouter.filter(r => r[0] === id);
+    const signups = gouterSignupsFor(id);
+    const options = gouterOptionsFor(id);
     html += `<div class="cp-match-card">` + matchCardHeader(ev, `
-      <div class="cp-summary-badge"><div class="num" style="color:#c98cf0;">${entries.length}</div><div class="lbl">Inscrits</div></div>
+      <div class="cp-summary-badge"><div class="num" style="color:#c98cf0;">${signups.length}</div><div class="lbl">Inscrits</div></div>
     `, "gouter");
+
+    html += `<div class="cp-col-h" style="color:#c98cf0;">Qui amène quoi</div>`;
+    if (signups.length === 0) {
+      html += `<div class="cp-empty">Personne pour l'instant</div>`;
+    } else {
+      signups.forEach(s => { html += `<div class="cp-row"><span>${escapeHtml(s[1])}</span><span class="places">${escapeHtml(s[2])}</span></div>`; });
+    }
 
     if (identities.length === 0) {
       html += `<div class="muted" style="font-size:9.5px; margin-top:10px; text-align:center;">Seul ton parent peut modifier cette page pour toi.</div>`;
     } else {
       identities.forEach(idt => {
-        const entry = gouterEntryFor(id, idt.nom);
-        const quoi = entry ? entry[2] : "";
         html += `<div class="cp-edit-box">
           <div class="cp-edit-label">${idt.isChild ? `Pour ${escapeHtml(idt.nom)} <span class="cp-for-child">ton enfant</span>` : "Toi"}</div>
-          <input type="text" placeholder="ex: gâteau, boissons... (vide = pas inscrit)" value="${escapeHtml(quoi)}" data-gouter-quoi="${escapeHtml(id)}|||${escapeHtml(idt.nom)}" />
+          ${options.map(o => {
+            const checked = gouterHasItem(id, idt.nom, o);
+            return `<label style="display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12.5px; color:#e8e8ee;">
+              <input type="checkbox" data-gouter-item="${escapeHtml(id)}|||${escapeHtml(idt.nom)}|||${escapeHtml(o)}" ${checked ? "checked" : ""} style="width:17px; height:17px; flex-shrink:0;" />
+              ${escapeHtml(o)}
+            </label>`;
+          }).join("")}
+          ${options.length === 0 ? `<div class="muted" style="font-size:10.5px; margin-bottom:6px;">Aucun choix proposé pour l'instant — sois le premier à en ajouter un.</div>` : ""}
+          <div class="carte-propose" style="margin-top:6px;"><input type="text" placeholder="Ajouter un nouveau choix..." id="gouter-propose-${id}-${idt.nom}" /><button type="button" class="btn secondary" style="width:auto; padding:8px 12px;" data-gouter-propose="${escapeHtml(id)}|||${escapeHtml(idt.nom)}">Ajouter</button></div>
+          ${isAdmin && options.length > 0 ? `<div class="muted" style="font-size:9.5px; margin-top:6px;">Retirer un choix : ${options.map(o => `<span class="cp-for-child" style="cursor:pointer;" data-gouter-remove-option="${escapeHtml(id)}|||${escapeHtml(o)}">${escapeHtml(o)} ✕</span>`).join(" ")}</div>` : ""}
         </div>`;
       });
     }
@@ -957,10 +1009,29 @@ function attachGestionMatchsEvents() {
     };
   });
 
-  document.querySelectorAll("[data-gouter-quoi]").forEach(el => {
+  document.querySelectorAll("[data-gouter-item]").forEach(el => {
     el.onchange = () => {
-      const [eventId, nom] = el.dataset.gouterQuoi.split("|||");
-      setGouterApi(nom, eventId, el.value.trim());
+      vibrate();
+      const [eventId, nom, item] = el.dataset.gouterItem.split("|||");
+      setGouterItemApi(nom, eventId, item, el.checked);
+    };
+  });
+
+  document.querySelectorAll("[data-gouter-propose]").forEach(el => {
+    el.onclick = () => {
+      const [eventId, nom] = el.dataset.gouterPropose.split("|||");
+      const input = document.getElementById(`gouter-propose-${eventId}-${nom}`);
+      const val = input ? input.value.trim() : "";
+      if (val) {
+        addGouterOptionApi(eventId, val).then(() => setGouterItemApi(nom, eventId, val, true));
+      }
+    };
+  });
+
+  document.querySelectorAll("[data-gouter-remove-option]").forEach(el => {
+    el.onclick = () => {
+      const [eventId, option] = el.dataset.gouterRemoveOption.split("|||");
+      removeGouterOptionApi(eventId, option);
     };
   });
 
