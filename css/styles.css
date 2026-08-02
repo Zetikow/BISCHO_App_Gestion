@@ -206,6 +206,8 @@ tr.total-row td { font-weight: 800; background: #1a1710; color: #ffd23f; }
 .login-card .login-title { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: -0.6px; margin-bottom: 6px; position: relative; }
 .login-card .login-subtitle { font-size: 13px; color: #e4e8f2; text-transform: uppercase; letter-spacing: 1.4px; font-weight: 700; margin-bottom: 10px; position: relative; }
 .login-error { color: #ff5a5a; font-size: 13px; margin-top: 10px; font-weight: 600; }
+.login-spinner { width: 38px; height: 38px; margin: 6px auto 18px; border-radius: 50%; border: 3px solid rgba(var(--accent2-rgb),0.25); border-top-color: var(--accent2); animation: ptrspin 0.7s linear infinite; position: relative; }
+.login-busy-message { font-size: 13px; color: #e4e8f2; font-weight: 600; position: relative; }
 .login-card .field-label { font-size: 13px; }
 .login-card select, .login-card input { font-size: 17px; padding: 13px; }
 .field-label { display: block; text-align: left; margin: 12px 0 5px; font-size: 11px; color: #e4e8f2; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }

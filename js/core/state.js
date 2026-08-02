@@ -106,6 +106,12 @@ let loginNeedsSetup = null; // null = pas encore vérifié, true/false ensuite
 let loginSelectedNom = localStorage.getItem(LAST_USER_KEY) || "";
 let loginPrefilledFromMemory = !!loginSelectedNom;
 let loginNoms = null; // [{nom, role}, ...] chargé avant connexion, remplace la liste figée PLAYERS pour le menu
+// Le login peut être long : authentification puis synchronisation complète (~25 feuilles Google
+// Sheets en un seul appel api_getAll) — loginBusy/loginBusyMessage donnent un retour visuel
+// continu pendant toute cette attente (voir tryLogin/setInitialCode dans core/render.js),
+// plutôt que de laisser l'écran figé sans rien indiquer entre le clic et l'arrivée sur l'Accueil.
+let loginBusy = false;
+let loginBusyMessage = "";
 
 // ---------- Données ----------
 
