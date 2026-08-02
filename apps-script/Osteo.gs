@@ -379,9 +379,11 @@ function api_deleteOsteoSlot(ss, e) {
 // tentative d'appeler une action réservée à un autre rôle échoue comme pour n'importe qui.
 
 // Réservé à Ostéo/Admin (même allowlist que api_addOsteoSlot) : crée le compte d'une personne
-// externe au club, avec le rôle "Externe" (jamais un autre rôle, même si le paramètre "equipe" est
-// manipulé côté client — le préfixe "Externe:" est toujours forcé ici). Code PIN laissé vide,
-// auto-activé ensuite via l'existant api_setCode, exactement comme addOsteoAccount() pour Eve.
+// externe au club, avec le rôle "Externe:Toutes" toujours — un externe n'est jamais rattaché à
+// une équipe précise (décision du club : aucune distinction par équipe pour ce profil), donc
+// "Toutes" est forcé ici sans condition, même si le client envoie encore un paramètre "equipe"
+// (défense en profondeur, jamais fait confiance). Code PIN laissé vide, auto-activé ensuite via
+// l'existant api_setCode, exactement comme addOsteoAccount() pour Eve.
 function api_addExterneAccount(ss, e) {
   const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
   if (!hasRole(role, "Ostéo") && !hasRole(role, "Admin")) return jsonOut({ ok: false, error: "forbidden" });
@@ -393,10 +395,9 @@ function api_addExterneAccount(ss, e) {
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][COL_NOM]).trim() === nom) return jsonOut({ ok: false, error: "exists" });
   }
-  const equipe = e.parameter.equipe || "Toutes";
   const row = new Array(8).fill("");
   row[COL_NOM] = nom;
-  row[COL_ROLES] = "Externe:" + equipe;
+  row[COL_ROLES] = "Externe:Toutes";
   sheet.appendRow(row);
   return jsonOut({ ok: true });
 }
