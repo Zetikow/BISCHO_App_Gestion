@@ -25,7 +25,10 @@ let oeSession = JSON.parse(localStorage.getItem(OE_SESSION_KEY) || "null");
 let oeLoginNom = "";
 let oeLoginStep = "nom"; // "nom" | "setcode" | "code"
 let oeLoginError = "";
-let oeLoginBusy = false;
+let oeLoginBusy = false; // écran de chargement PLEIN ÉCRAN (connexion + synchro des données) — voir oeRenderLoginBusyScreen
+let oeLoginBusyMessage = "";
+let oeCheckingStatus = false; // désactive juste le bouton "Continuer" pendant la vérification du nom (pas plein écran, trop rapide pour ça)
+let __oeLastNavPillRect = null;
 
 // ----- État après connexion -----
 let oeCurrentView = "osteo"; // "osteo" | "profil" | "support" | "consignes"
@@ -42,11 +45,13 @@ let oeSupportHistoryState = { loading: false, loaded: false, history: [] };
 let oeSupportSending = false;
 let oeSupportSent = false;
 
+// Icônes SVG (même style outline que NAV_ICONS dans js/core/render.js de l'appli principale —
+// dupliquées ici plutôt qu'importées, cette page reste volontairement sans dépendance sur js/core/*).
 const OE_TABS = [
-  { id: "osteo", label: "Ostéo", icon: "🩺" },
-  { id: "profil", label: "Profil", icon: "👤" },
-  { id: "support", label: "Support", icon: "💬" },
-  { id: "consignes", label: "Infos", icon: "📖" },
+  { id: "osteo", label: "Ostéo", icon: '<path d="M5 3v5a3 3 0 003 3 3 3 0 003-3V3"/><path d="M8 11v2a6 6 0 006 6 6 6 0 006-6v-2"/><circle cx="20" cy="7" r="2"/><circle cx="14" cy="21" r="2"/>' },
+  { id: "profil", label: "Profil", icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>' },
+  { id: "support", label: "Support", icon: '<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>' },
+  { id: "consignes", label: "Infos", icon: '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>' },
 ];
 
 function oeEscapeHtml(str) {
@@ -79,9 +84,28 @@ function oeDateLabel(dateStr, heureStr) {
 function oeRender() {
   const root = document.getElementById("oe-shell");
   if (!root) return;
+
+  // Écran de chargement plein-écran pendant toute la connexion/synchro (même roue que les apps
+  // classiques) — vérifié AVANT le reste, sinon dès que oeSession est réglé (juste avant
+  // oeLoadMainData) on basculerait sur l'écran principal avec des données encore vides.
+  if (oeLoginBusy) {
+    root.classList.remove("oe-with-nav");
+    root.innerHTML = oeRenderLoginBusyScreen();
+    return;
+  }
+
   root.classList.toggle("oe-with-nav", !!oeSession); // laisse la place à la nav du bas une fois connecté
   root.innerHTML = oeSession ? oeRenderMain() : oeRenderLogin();
-  if (oeSession) oeAttachMainEvents(); else oeAttachLoginEvents();
+  if (oeSession) { oeAttachMainEvents(); oePositionNavPill(); } else oeAttachLoginEvents();
+}
+
+function oeRenderLoginBusyScreen() {
+  return `<div class="oe-login-wrap"><div class="oe-login-outer"><div class="oe-login-card">
+    <div class="oe-login-glow"></div>
+    <div class="oe-login-title">Réservation ostéo</div>
+    <div class="oe-login-spinner" aria-hidden="true"></div>
+    <div class="oe-login-busy-message">${oeEscapeHtml(oeLoginBusyMessage || "Connexion...")}</div>
+  </div></div></div>`;
 }
 
 // ===================== ÉCRAN DE CONNEXION =====================
@@ -95,17 +119,17 @@ function oeRenderLogin() {
       <input id="oe-newcode" type="password" inputmode="numeric" maxlength="4" placeholder="••••" />
       <label class="oe-field-label">Confirme le code</label>
       <input id="oe-newcode2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" />
-      <div style="margin-top:16px;"><button class="oe-btn" id="oe-setcode-btn" ${oeLoginBusy ? "disabled" : ""}>Définir mon code et me connecter</button></div>
+      <div style="margin-top:16px;"><button class="oe-btn" id="oe-setcode-btn">Définir mon code et me connecter</button></div>
     `;
   } else if (oeLoginStep === "code") {
     stepHtml = `
       <label class="oe-field-label">Code (4 chiffres)</label>
       <input id="oe-code" type="password" inputmode="numeric" maxlength="4" placeholder="••••" />
-      <div style="margin-top:16px;"><button class="oe-btn" id="oe-login-btn" ${oeLoginBusy ? "disabled" : ""}>Se connecter</button></div>
+      <div style="margin-top:16px;"><button class="oe-btn" id="oe-login-btn">Se connecter</button></div>
       <div class="oe-muted" id="oe-change-nom" style="margin-top:12px; cursor:pointer; text-decoration:underline;">Ce n'est pas moi — changer de nom</div>
     `;
   } else {
-    stepHtml = `<div style="margin-top:16px;"><button class="oe-btn" id="oe-continue-btn" ${oeLoginBusy ? "disabled" : ""}>Continuer</button></div>`;
+    stepHtml = `<div style="margin-top:16px;"><button class="oe-btn" id="oe-continue-btn" ${oeCheckingStatus ? "disabled" : ""}>Continuer</button></div>`;
   }
 
   return `<div class="oe-login-wrap"><div class="oe-login-outer"><div class="oe-login-card">
@@ -160,12 +184,12 @@ function oeAttachLoginEvents() {
 }
 
 async function oeCheckAccountStatus(nom) {
-  oeLoginBusy = true; oeLoginError = ""; oeRender();
+  oeCheckingStatus = true; oeLoginError = ""; oeRender();
   try {
     const params = new URLSearchParams({ action: "accountStatus", nom });
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     const data = await res.json();
-    oeLoginBusy = false;
+    oeCheckingStatus = false;
     if (!data.ok) {
       oeLoginError = "Ce nom n'est associé à aucun compte. Vérifie l'orthographe exacte avec Eve.";
       oeRender();
@@ -174,20 +198,20 @@ async function oeCheckAccountStatus(nom) {
     oeLoginStep = data.needsSetup ? "setcode" : "code";
     oeRender();
   } catch (err) {
-    oeLoginBusy = false;
+    oeCheckingStatus = false;
     oeLoginError = "Connexion impossible pour le moment (hors ligne ?).";
     oeRender();
   }
 }
 
 async function oeSetInitialCode(nom, newCode) {
-  oeLoginBusy = true; oeLoginError = ""; oeRender();
+  oeLoginBusy = true; oeLoginBusyMessage = "Connexion..."; oeLoginError = ""; oeRender();
   try {
     const params = new URLSearchParams({ action: "setCode", nom, newCode });
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     const data = await res.json();
-    oeLoginBusy = false;
     if (!data.ok) {
+      oeLoginBusy = false;
       oeLoginError = data.error === "already_set" ? "Un code existe déjà pour ce compte — utilise-le pour te connecter." : "Échec de la création du code.";
       if (data.error === "already_set") oeLoginStep = "code";
       oeRender();
@@ -195,7 +219,11 @@ async function oeSetInitialCode(nom, newCode) {
     }
     oeSession = { nom, code: newCode };
     localStorage.setItem(OE_SESSION_KEY, JSON.stringify(oeSession));
-    oeLoadMainData();
+    oeLoginBusyMessage = "Chargement des données...";
+    oeRender();
+    await oeLoadMainData();
+    oeLoginBusy = false;
+    oeRender();
   } catch (err) {
     oeLoginBusy = false;
     oeLoginError = "Connexion impossible pour le moment (hors ligne ?).";
@@ -204,20 +232,24 @@ async function oeSetInitialCode(nom, newCode) {
 }
 
 async function oeDoLogin(nom, code) {
-  oeLoginBusy = true; oeLoginError = ""; oeRender();
+  oeLoginBusy = true; oeLoginBusyMessage = "Connexion..."; oeLoginError = ""; oeRender();
   try {
     const params = new URLSearchParams({ action: "login", nom, code });
     const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
     const data = await res.json();
-    oeLoginBusy = false;
     if (!data.ok) {
+      oeLoginBusy = false;
       oeLoginError = "Nom ou code incorrect.";
       oeRender();
       return;
     }
     oeSession = { nom, code };
     localStorage.setItem(OE_SESSION_KEY, JSON.stringify(oeSession));
-    oeLoadMainData();
+    oeLoginBusyMessage = "Chargement des données...";
+    oeRender();
+    await oeLoadMainData();
+    oeLoginBusy = false;
+    oeRender();
   } catch (err) {
     oeLoginBusy = false;
     oeLoginError = "Connexion impossible pour le moment (hors ligne ?).";
@@ -395,13 +427,36 @@ function oeRenderConsignesTab() {
   </div>`;
 }
 
-// ----- Nav du bas -----
+// ----- Nav du bas (même langage visuel que .bottom-nav/.nav-pill des apps classiques, voir
+// oePositionNavPill ci-dessous pour la pastille glissante) -----
 function oeRenderBottomNav() {
-  return `<div class="oe-bottom-nav">
+  return `<div class="oe-bottom-nav"><div class="oe-nav-pill" id="oe-nav-pill"></div>
     ${OE_TABS.map(t => `<button type="button" class="oe-nav-btn ${oeCurrentView === t.id ? "active" : ""}" data-oe-view="${t.id}">
-      <span class="oe-nav-icon">${t.icon}</span>${t.label}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${t.icon}</svg>${t.label}
     </button>`).join("")}
   </div>`;
+}
+
+// Fait glisser la pastille derrière l'onglet actif — même technique que positionNavPill() dans
+// js/core/render.js de l'appli principale (mesure la position réelle du bouton actif, anime
+// depuis la position précédente pour un glissé fluide plutôt qu'un saut).
+function oePositionNavPill() {
+  const pill = document.getElementById("oe-nav-pill");
+  const activeBtn = document.querySelector(".oe-bottom-nav .oe-nav-btn.active");
+  if (!pill || !activeBtn) return;
+  const navRect = pill.parentElement.getBoundingClientRect();
+  const btnRect = activeBtn.getBoundingClientRect();
+  const targetLeft = btnRect.left - navRect.left;
+  const targetWidth = btnRect.width;
+
+  pill.style.transition = "none";
+  pill.style.left = (__oeLastNavPillRect ? __oeLastNavPillRect.left : targetLeft) + "px";
+  pill.style.width = (__oeLastNavPillRect ? __oeLastNavPillRect.width : targetWidth) + "px";
+  void pill.offsetWidth;
+  pill.style.transition = "left 0.28s cubic-bezier(.4,1.3,.4,1), width 0.28s cubic-bezier(.4,1.3,.4,1)";
+  pill.style.left = targetLeft + "px";
+  pill.style.width = targetWidth + "px";
+  __oeLastNavPillRect = { left: targetLeft, width: targetWidth };
 }
 
 function oeAttachMainEvents() {
