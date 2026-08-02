@@ -264,7 +264,17 @@ async function oeDoLogin(nom, code) {
 // cette page reste volontairement plus légère).
 
 function oeRenderMain() {
-  let html = `<div class="oe-title">Réservation ostéo</div><div class="oe-sub">Bonjour ${oeEscapeHtml(oeSession.nom)}.</div>`;
+  // Bouton de déconnexion en haut à droite, présent sur tous les onglets (plutôt que caché dans
+  // l'onglet Profil uniquement) — accès direct depuis n'importe où sur la page.
+  let html = `<div class="oe-header-row">
+    <div>
+      <div class="oe-title">Réservation ostéo</div>
+      <div class="oe-sub">Bonjour ${oeEscapeHtml(oeSession.nom)}.</div>
+    </div>
+    <button type="button" class="oe-logout-btn" id="oe-logout" aria-label="Se déconnecter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+    </button>
+  </div>`;
 
   if (oeCurrentView === "consignes") {
     html += oeRenderConsignesTab();
@@ -377,7 +387,6 @@ function oeRenderProfilTab() {
     <div class="oe-muted">rendez-vous passé${moi.rdvPasses > 1 ? "s" : ""}</div>
   </div>`;
 
-  html += `<div class="oe-logout" id="oe-logout">Se déconnecter</div>`;
   return html;
 }
 

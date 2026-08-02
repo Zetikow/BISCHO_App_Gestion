@@ -127,7 +127,10 @@ label.oe-field-label { display: block; text-align: left; margin: 12px 0 5px; fon
 .oe-motif-actions { display: flex; gap: 8px; margin-top: 8px; }
 .oe-motif-actions .oe-btn { margin: 0; }
 
-.oe-logout { display: block; text-align: center; margin: 22px 0 6px; font-size: 12px; color: #e4e8f2; text-decoration: underline; cursor: pointer; }
+.oe-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.oe-logout-btn { flex-shrink: 0; background: none; border: 1px solid rgba(var(--accent2-rgb),0.25); border-radius: 10px; padding: 8px; color: #e4e8f2; cursor: pointer; }
+.oe-logout-btn svg { display: block; width: 18px; height: 18px; }
+.oe-logout-btn:active { transform: scale(0.92); }
 
 /* ---------- Nav du bas (4 onglets : Ostéo / Profil / Support / Consignes) ---------- */
 /* Même langage visuel que la barre de nav des apps "classiques" (.bottom-nav/.nav-pill/.nav-btn
