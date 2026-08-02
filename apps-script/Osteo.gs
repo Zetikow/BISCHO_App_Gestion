@@ -366,3 +366,103 @@ function api_deleteOsteoSlot(ss, e) {
   }
   return jsonOut({ ok: true });
 }
+
+// ===================== RDV OSTÉO — PERSONNES EXTERNES AU CLUB =====================
+// Un "externe" est une personne qu'Eve suit en dehors du club (pas un membre) : elle réserve/
+// annule ses propres créneaux depuis une page à part (osteo-externe.html), qui ne partage AUCUN
+// fichier frontend avec le reste de l'appli (voir js/osteo-externe.js). Côté backend en revanche,
+// c'est le même compte "Comptes" et les mêmes feuilles OsteoSlots/OsteoReservations que tout le
+// monde : Eve voit donc les réservations des externes exactement au même endroit que celles des
+// joueurs, dans sa vue manager RDV Ostéo habituelle, sans rien changer à son propre usage de
+// l'appli. Le rôle "Externe" ne donne accès à AUCUNE autre route de l'API que reserveOsteoSlot/
+// cancelOsteoReservation/getOsteoExterneData (génériques, non restreintes par rôle) — toute
+// tentative d'appeler une action réservée à un autre rôle échoue comme pour n'importe qui.
+
+// Réservé à Ostéo/Admin (même allowlist que api_addOsteoSlot) : crée le compte d'une personne
+// externe au club, avec le rôle "Externe" (jamais un autre rôle, même si le paramètre "equipe" est
+// manipulé côté client — le préfixe "Externe:" est toujours forcé ici). Code PIN laissé vide,
+// auto-activé ensuite via l'existant api_setCode, exactement comme addOsteoAccount() pour Eve.
+function api_addExterneAccount(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!hasRole(role, "Ostéo") && !hasRole(role, "Admin")) return jsonOut({ ok: false, error: "forbidden" });
+  const nom = String(e.parameter.nom || "").trim();
+  if (!nom) return jsonOut({ ok: false, error: "missing_nom" });
+  const sheet = ss.getSheetByName("Comptes");
+  ensureComptesSchema(sheet);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][COL_NOM]).trim() === nom) return jsonOut({ ok: false, error: "exists" });
+  }
+  const equipe = e.parameter.equipe || "Toutes";
+  const row = new Array(8).fill("");
+  row[COL_NOM] = nom;
+  row[COL_ROLES] = "Externe:" + equipe;
+  sheet.appendRow(row);
+  return jsonOut({ ok: true });
+}
+
+// Données minimales pour la page externe : les créneaux à venir pertinents pour l'équipe de
+// l'appelant (ou "Toutes" pour un compte Ostéo/Admin de test), avec juste un booléen "disponible"
+// (jamais le nom ni le motif de la personne qui a réservé), PLUS les propres réservations de
+// l'appelant (celles-là seules, avec leur motif). Contrairement à api_getAll (utilisé par le reste
+// de l'appli, où c'est uniquement l'UI qui cache les infos des autres), ce endpoint ne renvoie
+// JAMAIS les données des autres personnes, même dans la réponse brute. checkAuth suffit comme
+// garde (pas de rôle "Externe" imposé) : un Admin/Ostéo qui teste cette page doit aussi pouvoir la
+// charger, et cette fonction ne fait de toute façon rien de plus sensible que ça. Pas de try/catch
+// ici : doGet() (Router.gs) enveloppe déjà tout appel de handler dans le sien.
+function api_getOsteoExterneData(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!role) return jsonOut({ ok: false, error: "auth" });
+
+  let callerEquipe = "Toutes";
+  if (!hasRole(role, "Admin") && !hasRole(role, "Ostéo")) {
+    const details = getSessionRoleDetails(ss, e.parameter.authNom, e.parameter.authCode) || [];
+    const externeRole = details.find(d => d.role === "Externe");
+    callerEquipe = externeRole ? externeRole.equipe : "Toutes";
+  }
+
+  setupOsteoSlots();
+  setupOsteoReservations();
+  const slotsData = ss.getSheetByName("OsteoSlots").getDataRange().getValues();
+  const resaData = ss.getSheetByName("OsteoReservations").getDataRange().getValues();
+  const tz = Session.getScriptTimeZone();
+
+  const reservedSlotIds = new Set();
+  for (let i = 1; i < resaData.length; i++) reservedSlotIds.add(resaData[i][0]);
+
+  const todayStr = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  const slots = [];
+  for (let i = 1; i < slotsData.length; i++) {
+    const row = slotsData[i];
+    if (!row[0]) continue;
+    const dateStr = row[1] instanceof Date ? Utilities.formatDate(row[1], tz, "yyyy-MM-dd") : String(row[1] || "");
+    if (dateStr < todayStr) continue; // ne montre jamais les créneaux passés
+    const equipe = row[4] || "Toutes";
+    if (equipe !== "Toutes" && equipe !== callerEquipe) continue;
+    slots.push({
+      id: row[0],
+      date: dateStr,
+      heure: row[2] instanceof Date ? Utilities.formatDate(row[2], tz, "HH:mm") : String(row[2] || ""),
+      lieu: row[3] || "",
+      equipe: equipe,
+      disponible: !reservedSlotIds.has(row[0]),
+    });
+  }
+
+  const mesReservations = [];
+  for (let i = 1; i < resaData.length; i++) {
+    if (resaData[i][1] !== e.parameter.authNom) continue; // jamais les réservations des autres
+    const slotId = resaData[i][0];
+    const slotRow = slotsData.find(r => r[0] === slotId);
+    if (!slotRow) continue;
+    mesReservations.push({
+      slotId: slotId,
+      motif: resaData[i][2] || "",
+      date: slotRow[1] instanceof Date ? Utilities.formatDate(slotRow[1], tz, "yyyy-MM-dd") : String(slotRow[1] || ""),
+      heure: slotRow[2] instanceof Date ? Utilities.formatDate(slotRow[2], tz, "HH:mm") : String(slotRow[2] || ""),
+      lieu: slotRow[3] || "",
+    });
+  }
+
+  return jsonOut({ ok: true, slots: slots, mesReservations: mesReservations });
+}

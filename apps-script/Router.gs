@@ -29,6 +29,8 @@ const API_HANDLERS = {
   cancelOsteoReservation: api_cancelOsteoReservation,       // Osteo.gs
   reassignOsteoSlotPriority: api_reassignOsteoSlotPriority, // Osteo.gs
   deleteOsteoSlot: api_deleteOsteoSlot,                     // Osteo.gs
+  addExterneAccount: api_addExterneAccount,                 // Osteo.gs
+  getOsteoExterneData: api_getOsteoExterneData,             // Osteo.gs
   setCovoiturage: api_setCovoiturage,                       // Covoiturage.gs
   setPresence: api_setPresence,                             // Presences.gs
   setPresenceEvenement: api_setPresenceEvenement,           // Presences.gs
