@@ -28,8 +28,10 @@ async function fetchAll() {
     compositions = (data.compositions || []).slice(1).filter(r => r[0]);
     compositionsMeta = (data.compositionsMeta || []).slice(1).filter(r => r[0]);
     selections = (data.selections || []).slice(1).filter(r => r[0]);
+    selectionsMeta = (data.selectionsMeta || []).slice(1).filter(r => r[0]);
     benevoles = (data.benevoles || []).slice(1).filter(r => r[0]);
     gouter = (data.gouter || []).slice(1).filter(r => r[0]);
+    gouterOptions = (data.gouterOptions || []).slice(1).filter(r => r[0]);
     tableMarque = (data.tableMarque || []).slice(1).filter(r => r[0]);
     maillots = (data.maillots || []).slice(1).filter(r => r[0]);
     foodtrucks = (data.foodtrucks || []).slice(1).filter(r => r[0]);

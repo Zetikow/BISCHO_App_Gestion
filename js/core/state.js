@@ -26,8 +26,10 @@ let osteoReservations = []; // [[slotId, nom, motif], ...] (+ header row)
 let compositions = []; // [[matchId, nom, zone, libreX, libreY], ...] — zone = poste fixe (GB/AiG/.../Banc5) ou "Libre"
 let compositionsMeta = []; // [[matchId, publie], ...] — publie = "1" une fois visible aux joueurs/parents
 let selections = []; // [[eventId, nom, selectionne], ...] — qui est retenu pour un match (SM1), réservé Coach/Admin
+let selectionsMeta = []; // [[eventId, publie], ...] — publie = "1" une fois la sélection visible aux joueurs/parents
 let benevoles = []; // [[eventId, nom, present], ...] — qui s'est proposé bénévole pour un événement de type "Bénévole"
-let gouter = []; // [[eventId, nom, quoi], ...] (+ header row) — Gestion des matchs
+let gouter = []; // [[eventId, nom, item], ...] (+ header row) — un item coché par ligne (plusieurs items possibles par personne), Gestion des matchs
+let gouterOptions = []; // [[eventId, optionsJSON], ...] (+ header row) — liste extensible des choix proposés pour le goûter d'un match donné
 let tableMarque = []; // [[eventId, nom, disponible], ...] (+ header row)
 let maillots = []; // [[eventId, nom, pris], ...] (+ header row)
 let foodtrucks = []; // [[id, eventId, nom, prix, benefice, notes], ...] (+ header row)
@@ -216,10 +218,13 @@ function rosterForEquipe(equipe) {
   return comptes.slice(1).filter(c => rowHasRole(c, "Joueur") && rowEquipesForRole(c, "Joueur").indexOf(equipe) !== -1).map(c => c[0]);
 }
 
-// Même idiome que rosterForEquipe mais pour le rôle "Bénévole" — sert à lister qui peut
-// s'inscrire comme bénévole pour une équipe donnée (voir renderPresenceBenevoleSheet).
-function benevolesForEquipe(equipe) {
-  return comptes.slice(1).filter(c => rowHasRole(c, "Bénévole") && rowEquipesForRole(c, "Bénévole").indexOf(equipe) !== -1).map(c => c[0]);
+// Même idiome que rosterForEquipe mais pour le rôle "Bénévole" — sert à lister tous les comptes
+// bénévoles du club, PEU IMPORTE leur équipe (les événements Bénévole sont club-entier, jamais
+// filtrés par équipe — voir renderBenevoleSection dans presence.js). Anciennement filtré par
+// équipe (benevolesForEquipe) ; changé en club-entier suite à la correction du périmètre de
+// l'onglet Bénévole.
+function benevolesForClub() {
+  return comptes.slice(1).filter(c => rowHasRole(c, "Bénévole")).map(c => c[0]);
 }
 
 // Équipes qu'un compte peut consulter : toutes celles de ses rôles cumulés (ex: un joueur

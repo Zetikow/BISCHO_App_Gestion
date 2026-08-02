@@ -52,8 +52,11 @@ const API_HANDLERS = {
   setCompositionFreePos: api_setCompositionFreePos,         // Compositions.gs
   publishComposition: api_publishComposition,               // Compositions.gs
   setSelection: api_setSelection,                           // Selections.gs
+  publishSelection: api_publishSelection,                   // Selections.gs
   setBenevole: api_setBenevole,                             // Benevoles.gs
   setGouter: api_setGouter,                                 // Gouter.gs
+  addGouterOption: api_addGouterOption,                     // Gouter.gs
+  removeGouterOption: api_removeGouterOption,               // Gouter.gs
   setTableMarque: api_setTableMarque,                       // TableMarque.gs
   setMaillots: api_setMaillots,                             // Maillots.gs
   addFoodtruck: api_addFoodtruck,                           // Foodtrucks.gs

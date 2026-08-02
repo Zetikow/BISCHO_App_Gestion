@@ -48,10 +48,14 @@ function api_getAll(ss, e) {
   const compositionsMeta = compositionsMetaSheet ? compositionsMetaSheet.getDataRange().getValues() : [];
   const selectionsSheet = ss.getSheetByName("Selections");
   const selections = selectionsSheet ? selectionsSheet.getDataRange().getValues() : [];
+  const selectionsMetaSheet = ss.getSheetByName("SelectionsMeta");
+  const selectionsMeta = selectionsMetaSheet ? selectionsMetaSheet.getDataRange().getValues() : [];
   const benevolesSheet = ss.getSheetByName("Benevoles");
   const benevoles = benevolesSheet ? benevolesSheet.getDataRange().getValues() : [];
   const gouterSheet = ss.getSheetByName("Gouter");
   const gouter = gouterSheet ? gouterSheet.getDataRange().getValues() : [];
+  const gouterOptionsSheet = ss.getSheetByName("GouterOptions");
+  const gouterOptions = gouterOptionsSheet ? gouterOptionsSheet.getDataRange().getValues() : [];
   const tableMarqueSheet = ss.getSheetByName("TableMarque");
   const tableMarque = tableMarqueSheet ? tableMarqueSheet.getDataRange().getValues() : [];
   const maillotsSheet = ss.getSheetByName("Maillots");
@@ -67,5 +71,5 @@ function api_getAll(ss, e) {
   const repasFinancesSheet = ss.getSheetByName("RepasFinances");
   const repasFinances = (repasFinancesSheet && canManageRepas(callerRole)) ? repasFinancesSheet.getDataRange().getValues() : [];
 
-  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, benevoles, gouter, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasTarifs, repasFinances });
+  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, selectionsMeta, benevoles, gouter, gouterOptions, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasTarifs, repasFinances });
 }
