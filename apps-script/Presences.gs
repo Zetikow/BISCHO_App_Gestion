@@ -87,5 +87,30 @@ function api_setPresenceEvenement(ss, e) {
     }
   }
   if (!found) sheet.appendRow([eventId, nom, present, hasJustification ? justification : ""]);
+
+  if (present === "Non") notifyAbsenceTardivePush(ss, eventId, nom, hasJustification ? justification : "");
+
   return jsonOut({ ok: true });
+}
+
+// Prévient le(s) Coach(es) de l'équipe quand une absence est déclarée à moins de 48h de
+// l'événement — jamais bloquant pour l'enregistrement de la présence elle-même.
+function notifyAbsenceTardivePush(ss, eventId, nom, justification) {
+  try {
+    const evSheet = ss.getSheetByName("Evenements");
+    const evData = evSheet.getDataRange().getValues();
+    const evRow = evData.find(r => r[0] === eventId);
+    if (!evRow) return;
+    const evDateTime = new Date(String(evRow[1]) + "T" + (evRow[2] || "00:00"));
+    const hoursUntil = (evDateTime.getTime() - Date.now()) / 3600000;
+    if (hoursUntil < 0 || hoursUntil >= 48) return; // événement déjà passé, ou encore à plus de 48h
+
+    const equipe = evRow[6] || "SM1";
+    const motifClause = justification ? ` — motif : ${justification}` : "";
+    const body = `${nom} a déclaré une absence à moins de 48h${motifClause}.`;
+    const coachTokens = pushTokensForEquipe(ss, equipe, ["Coach"], false);
+    coachTokens.forEach(token => sendPushNotification(token, "⚠️ Absence tardive", body));
+  } catch (err) {
+    Logger.log("Erreur notif push absence tardive : " + err);
+  }
 }

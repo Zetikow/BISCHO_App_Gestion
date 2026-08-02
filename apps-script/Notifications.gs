@@ -120,6 +120,16 @@ function sendDisponibilitesReminders(mode) {
   joueurs.forEach(j => {
     const pending = upcomingTrainings.filter(t => t.equipe === j.equipe && !responded.has(`${t.id}_${j.nom}`));
     if (pending.length === 0) return;
+
+    // Notification push — indépendante du mail ci-dessous (envoyée même sans adresse mail
+    // renseignée), même texte quel que soit le mode (friday/sunday). Jamais bloquant.
+    try {
+      const token = pushTokenForNom(ss, j.nom);
+      if (token) sendPushNotification(token, "⏰ Présence à renseigner", "Réponds avant dimanche minuit pour les entraînements de la semaine.");
+    } catch (err) {
+      Logger.log("Erreur notif push rappel présence à " + j.nom + " : " + err);
+    }
+
     if (!j.email) return; // pas d'adresse mail renseignée : rien à envoyer pour cette personne
 
     // La sanction caisse noire ne concerne que la SM1 — on ne la mentionne pas aux autres équipes.
