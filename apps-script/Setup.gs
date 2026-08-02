@@ -25,6 +25,7 @@ function setup() {
   setupOsteoReservations();
   setupCompositions();
   setupSelections();
+  setupBenevoles();
   setupGouter();
   setupTableMarque();
   setupMaillots();
