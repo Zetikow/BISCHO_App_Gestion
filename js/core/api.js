@@ -5,6 +5,8 @@
 // module (writeXxxApi) restent dans leur fichier respectif.
 // ===================================================================
 
+let __fetchAllConsecutiveFailures = 0;
+
 async function fetchAll() {
   let rawText = null;
   try {
@@ -39,8 +41,13 @@ async function fetchAll() {
     presenceEvenements = parsedPE.p;
     presenceJustifications = parsedPE.j;
     isOnline = true;
+    __fetchAllConsecutiveFailures = 0;
   } catch (err) {
-    isOnline = false;
+    // Un seul sondage raté (hoquet réseau, Apps Script un peu lent) ne veut pas dire qu'on est
+    // vraiment hors ligne — ça faisait clignoter le bandeau "Hors ligne" toutes les ~10s dès
+    // qu'une requête traînait un peu. On attend 2 échecs D'AFFILÉE avant de vraiment l'afficher.
+    __fetchAllConsecutiveFailures++;
+    if (__fetchAllConsecutiveFailures >= 2) isOnline = false;
   }
   // Ne reconstruit l'affichage que si les données (ou le statut en ligne/hors ligne) ont
   // réellement changé depuis le dernier rendu — la plupart des sondages toutes les 10s ne
