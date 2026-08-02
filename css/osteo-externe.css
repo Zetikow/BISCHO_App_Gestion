@@ -1,0 +1,131 @@
+/* ===================================================================
+   RDV OSTÉO — page externe (osteo-externe.html), feuille de style DÉDIÉE
+   et AUTONOME : ne dépend pas de css/styles.css (l'appli principale), pour
+   rester décorrélée d'elle comme le reste de cette page (JS séparé, pas de
+   PWA). Reprend volontairement la palette "Marine" et le langage visuel
+   (fond à halos + wordmark en filigrane + cartes) déjà utilisés ailleurs
+   dans l'écosystème du club, pour que cette page ait le même niveau de
+   finition — mais retexturé pour rester neutre : le filigrane affiche
+   "OSTÉO", jamais "LustuZone" ni le nom du club.
+   =================================================================== */
+
+:root {
+  --accent: #4a6f94;
+  --accent-rgb: 74,111,148;
+  --accent2: #9db4c7;
+  --accent2-rgb: 157,180,199;
+  --gold: #d3bd6e;
+  --gold-rgb: 211,189,110;
+  --silver: #e7ecf1;
+  --navy: #0e2038;
+  --navy-rgb: 14,32,56;
+  --grad: linear-gradient(135deg, var(--navy) 0%, var(--accent) 55%, var(--silver) 100%);
+  --glow: radial-gradient(circle, rgba(var(--accent2-rgb),0.3), transparent 70%);
+  --font-disp: 'DM Sans', sans-serif;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body { margin: 0; padding: 0; background: var(--navy); overflow-x: hidden; }
+body {
+  position: relative;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #e8e8ee;
+  min-height: 100vh;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+/* Wordmark "OSTÉO" en filigrane néon, fixe au centre de l'écran, sous le contenu (voir .oe-shell
+   plus bas) — même technique que le fond à halos : jamais une photo, juste un dégradé + un texte,
+   s'étire proprement quelle que soit la longueur de la page. */
+#bg-wordmark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-20deg);
+  width: 130vw;
+  text-align: center;
+  pointer-events: none;
+  z-index: 0;
+  font-size: clamp(48px, 18vw, 110px);
+  font-weight: 800;
+  letter-spacing: 1px;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #fff 10%, rgba(var(--accent2-rgb),1) 60%, rgba(var(--accent-rgb),1) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 26px rgba(var(--accent2-rgb),0.5)) drop-shadow(0 0 54px rgba(var(--accent-rgb),0.38));
+}
+
+/* Fond nuancé (dégradé + halos radiaux) au-dessus duquel tout le contenu passe (position:relative +
+   z-index:1), lui-même au-dessus du wordmark en filigrane (z-index:0). */
+.oe-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  min-height: 100vh;
+  background-color: var(--navy);
+  background-image:
+    radial-gradient(480px 340px at 18% 6%, rgba(var(--accent-rgb),0.5), transparent 60%),
+    radial-gradient(420px 320px at 88% 30%, rgba(var(--accent2-rgb),0.35), transparent 62%),
+    radial-gradient(360px 300px at 30% 78%, rgba(var(--gold-rgb),0.22), transparent 65%),
+    linear-gradient(180deg, rgba(var(--accent-rgb),0.16) 0%, transparent 45%, rgba(var(--accent-rgb),0.16) 100%);
+}
+@media (min-width: 700px) {
+  .oe-shell { margin: 24px auto 0; border-radius: 26px; }
+}
+
+.oe-title { font-family: var(--font-disp); font-size: 24px; font-weight: 700; color: #fff; margin: 4px 0 2px; }
+.oe-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-bottom: 18px; }
+
+.oe-section-h { font-size: 12px; font-weight: 700; font-family: var(--font-disp); color: #fff; margin: 18px 2px 10px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+.oe-section-h::before { content: ""; width: 15px; height: 8px; border-bottom: 2px solid var(--gold); border-radius: 0 0 60% 60%; flex-shrink: 0; }
+
+/* ---------- Champs + boutons ---------- */
+select, input, textarea { font-size: 15px; padding: 10px; border-radius: 10px; border: 1px solid #1c2333; background: #11141f; color: #e8e8ee; width: 100%; font-family: 'DM Sans', sans-serif; color-scheme: dark; }
+textarea { resize: vertical; }
+select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+label.oe-field-label { display: block; text-align: left; margin: 12px 0 5px; font-size: 11px; color: #e4e8f2; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+
+.oe-btn { padding: 12px 14px; border-radius: 12px; border: none; background: var(--grad); color: #fff; cursor: pointer; font-size: 13px; font-weight: 800; width: 100%; font-family: 'DM Sans', sans-serif; text-transform: uppercase; letter-spacing: 0.3px; transition: transform 0.12s, filter 0.15s; }
+.oe-btn:active { transform: scale(0.96); filter: brightness(0.92); }
+.oe-btn.secondary { background: #1a1f30; color: #e4e8f2; border: 1px solid #243049; }
+.oe-btn.danger { background: #7a2020; color: #fff; }
+.oe-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------- Carte de connexion ---------- */
+.oe-login-wrap { display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: 16px 0; }
+.oe-login-outer { border-radius: 26px; padding: 2px; background: var(--grad); width: 100%; max-width: 360px; }
+.oe-login-card { background: #11141fee; backdrop-filter: blur(6px); border: 1px solid rgba(var(--accent2-rgb),0.22); border-radius: 24px; padding: 34px 24px; text-align: center; position: relative; overflow: hidden; }
+.oe-login-card .oe-login-glow { position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: var(--glow); pointer-events: none; }
+.oe-login-title { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.4px; margin-bottom: 6px; position: relative; }
+.oe-login-subtitle { font-size: 12.5px; color: #e4e8f2; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; margin-bottom: 14px; position: relative; }
+.oe-login-card label { font-size: 12.5px; }
+.oe-login-card input { font-size: 17px; padding: 13px; text-align: center; }
+.oe-login-error { color: #ff8a8a; font-size: 13px; margin-top: 12px; font-weight: 600; }
+.oe-login-hint { font-size: 11px; color: #e4e8f2; margin-top: 10px; line-height: 1.5; }
+
+/* ---------- Cartes de contenu (créneaux, mes RDV) ---------- */
+.oe-card { background: #11141f; border: 1px solid rgba(var(--accent-rgb),0.28); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; position: relative; overflow: hidden; }
+.oe-muted { color: #e4e8f2; font-size: 12px; font-weight: 500; }
+.oe-slot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.oe-slot-date { font-family: var(--font-disp); font-size: 15px; font-weight: 700; color: #fff; text-transform: capitalize; }
+.oe-slot-meta { font-size: 12px; color: #e4e8f2; margin-top: 2px; }
+.oe-tag { font-size: 8.5px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: rgba(var(--accent2-rgb),0.15); color: var(--accent2); display: inline-block; flex-shrink: 0; }
+.oe-slot-motif { font-size: 11px; color: #e4e8f2; margin-top: 8px; font-style: italic; }
+.oe-slot-action { margin-top: 10px; }
+
+.oe-motif-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(var(--accent-rgb),0.2); }
+.oe-motif-actions { display: flex; gap: 8px; margin-top: 8px; }
+.oe-motif-actions .oe-btn { margin: 0; }
+
+.oe-logout { display: block; text-align: center; margin: 22px 0 6px; font-size: 12px; color: #e4e8f2; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Toast succès/échec (copie légère de l'app-toast principale) ---------- */
+.oe-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px) scale(0.92); background: #1a1f30; border: 1px solid #2a3350; color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 12.5px; font-weight: 800; text-align: center; z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.2s ease-out, transform 0.2s ease-out; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90vw; }
+.oe-toast.visible { opacity: 1; transform: translate(-50%, 0) scale(1); transition: opacity 0.35s cubic-bezier(.34,1.56,.64,1), transform 0.35s cubic-bezier(.34,1.56,.64,1); }
+.oe-toast.success { border-color: rgba(51,209,122,0.5); background: rgba(21,97,51,0.97); }
+.oe-toast.error { border-color: rgba(255,90,90,0.5); background: rgba(140,40,40,0.97); }

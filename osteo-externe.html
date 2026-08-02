@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0e2038" />
+<!-- Page volontairement à part : PAS une PWA (aucun manifest, aucun service worker, aucune
+     balise apple-mobile-web-app-*). Sert le même backend Google Apps Script que l'appli
+     principale du club (voir config/google-script-config.js), mais reste une simple page web
+     autonome, sans installation ni cache hors-ligne, destinée à des personnes suivies par
+     l'ostéopathe du club qui ne sont pas membres du club et n'ont pas à voir le reste de l'appli. -->
+<title>Réservation ostéo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Feuille de style dédiée et autonome (pas un lien vers css/styles.css de l'appli principale) :
+     reprend juste les jetons de couleur "Marine" et le langage visuel (fond à halos + wordmark en
+     filigrane + cartes) déjà utilisés ailleurs dans l'écosystème du club, retexturé pour cette
+     page (wordmark "OSTÉO" au lieu du nom d'une appli) — jamais de branding "LustuZone" ici. -->
+<link rel="stylesheet" href="css/osteo-externe.css">
+</head>
+<body>
+<div id="bg-wordmark">OSTÉO</div>
+<div class="oe-shell" id="oe-shell">Chargement...</div>
+
+<script src="config/google-script-config.js"></script>
+<script src="js/osteo-externe.js"></script>
+</body>
+</html>
