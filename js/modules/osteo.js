@@ -183,6 +183,8 @@ function renderOsteoManagerView() {
 
   html += `<button class="btn add-btn-primary" id="toggle-add-osteo-slot">+ Nouveau créneau</button>`;
 
+  html += renderOsteoExterneForm();
+
   const now = new Date();
   const upcoming = osteoSlots.filter(s => osteoSlotDate(s) >= now).sort((a, b) => osteoSlotDate(a) - osteoSlotDate(b));
 
@@ -213,6 +215,30 @@ function renderOsteoManagerView() {
       </div>`;
     });
     html += `</div>`;
+  }
+  return html;
+}
+
+// Petit formulaire (repliable) pour créer le compte d'une personne externe au club, suivie par
+// Eve en dehors du cadre du club (ex: ancien joueur, connaissance). Visible seulement ici, dans
+// la vue manager Ostéo (Eve/Admin) — jamais côté joueurs. La personne créée réserve ensuite ses
+// propres RDV depuis osteo-externe.html, une page séparée qui ne fait jamais partie de LustuZone.
+function renderOsteoExterneForm() {
+  const open = !!window.__showAddExterne;
+  let html = `<button class="btn secondary" id="toggle-add-externe" style="margin-top:8px;">${open ? "− Fermer" : "+ Ajouter un externe"}</button>`;
+  if (open) {
+    html += `<div class="add-form" style="margin-top:8px;">
+      <div class="muted" style="margin-bottom:8px;">Crée un compte pour quelqu'un que tu suis en dehors du club : il/elle réservera ses RDV depuis une page à part, jamais depuis LustuZone.</div>
+      <label class="field-label">Nom (tel qu'il/elle devra le taper pour se connecter)</label>
+      <input id="externe-nom" type="text" placeholder="Ex: Julie Dupont" />
+      <label class="field-label">Équipe concernée</label>
+      <select id="externe-equipe">
+        <option value="Toutes" selected>Toutes</option>
+        ${TEAMS.map(t => `<option value="${t}">${teamDisplayLabel(t)}</option>`).join("")}
+      </select>
+      <button class="btn" id="externe-submit" style="margin-top:10px;">Ajouter un externe</button>
+      <div class="muted" style="margin-top:10px; font-size:11px;">Donne-lui ce lien pour réserver : <a href="osteo-externe.html" target="_blank" rel="noopener" style="color:#9db4c7;">osteo-externe.html</a> — première connexion avec le nom exact ci-dessus, puis choix de son propre code.</div>
+    </div>`;
   }
   return html;
 }
@@ -285,6 +311,27 @@ async function deleteOsteoSlotApi(slotId) {
     const params = new URLSearchParams({ action: "deleteOsteoSlot", slotId, authNom: session.nom, authCode: session.code });
     await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
   } catch (err) { isOnline = false; render(); }
+}
+
+// Crée le compte d'une personne externe au club (rôle "Externe", forcé côté serveur) — voir
+// renderOsteoExterneForm() et api_addExterneAccount (Osteo.gs).
+async function addExterneAccountApi(nom, equipe) {
+  try {
+    const params = new URLSearchParams({ action: "addExterneAccount", nom, equipe, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) {
+      showToast("Externe ajouté", "success");
+      window.__showAddExterne = false;
+      render();
+    } else {
+      showToast(data.error === "exists" ? "Ce nom existe déjà" : "Échec de l'ajout", "error");
+    }
+  } catch (err) {
+    isOnline = false;
+    showToast("Échec de l'ajout (hors ligne ?)", "error");
+    render();
+  }
 }
 
 function attachOsteoEvents() {
@@ -378,4 +425,20 @@ function attachOsteoEvents() {
       deleteOsteoSlotApi(el.dataset.osteoDeleteSlot);
     };
   });
+
+  const toggleAddExterne = document.getElementById("toggle-add-externe");
+  if (toggleAddExterne) toggleAddExterne.onclick = () => {
+    vibrate();
+    window.__showAddExterne = !window.__showAddExterne;
+    render();
+  };
+
+  const externeSubmit = document.getElementById("externe-submit");
+  if (externeSubmit) externeSubmit.onclick = () => {
+    const nom = (document.getElementById("externe-nom").value || "").trim();
+    const equipe = document.getElementById("externe-equipe").value;
+    if (!nom) { alert("Merci de renseigner un nom."); return; }
+    vibrate();
+    addExterneAccountApi(nom, equipe);
+  };
 }
