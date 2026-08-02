@@ -18,13 +18,15 @@ function setupBenevoles() {
 
 // ===================== ACTION API =====================
 
-// Soi-même, ou un Coach/Admin pour quelqu'un d'autre (ex: en cas de besoin d'aide) — même
-// idiome que api_reserveOsteoSlot (Osteo.gs). present vide = retire la ligne (désinscription).
+// Soi-même, ou un Admin/Coach/Salarié pour quelqu'un d'autre (l'onglet Bénévole est un onglet de
+// gestion pour ces rôles, pas de l'auto-inscription — voir renderPresenceBenevoleSheet côté
+// frontend, même permission ici) — même idiome que api_reserveOsteoSlot (Osteo.gs). present vide
+// = retire la ligne (désinscription).
 function api_setBenevole(ss, e) {
   const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
   if (!role) return jsonOut({ ok: false, error: "auth" });
   const nom = e.parameter.nom || e.parameter.authNom;
-  if (nom !== e.parameter.authNom && !hasRole(role, "Coach") && !hasRole(role, "Admin")) {
+  if (nom !== e.parameter.authNom && !hasRole(role, "Coach") && !hasRole(role, "Admin") && !hasRole(role, "Salarié")) {
     return jsonOut({ ok: false, error: "forbidden" });
   }
   const sheet = ss.getSheetByName("Benevoles");

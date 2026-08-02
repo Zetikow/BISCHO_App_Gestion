@@ -133,7 +133,7 @@ function showToast(message, type) {
 
 // Retour visuel immédiat au toucher, indépendant du rafraîchissement de la page
 // (le CSS :active seul n'a pas toujours le temps de s'afficher avant le re-rendu)
-const TAP_SELECTOR = ".btn, .nav-btn, .toggle-btn, .ev-edit, .ev-del, .bottom-nav button, .expand-toggle, .avatar-btn, .avatar-menu-item, .qty-btn, .add-toggle, .justif-edit-btn, .team-switch-btn, .mode-tab-btn, .gm-section-chip, .cn-edit-pick-row, .cn-edit-cancel, .folder-card, .salaries-type-btn";
+const TAP_SELECTOR = ".btn, .nav-btn, .toggle-btn, .pres-toggle-option, .ev-edit, .ev-del, .bottom-nav button, .expand-toggle, .avatar-btn, .avatar-menu-item, .qty-btn, .add-toggle, .justif-edit-btn, .team-switch-btn, .mode-tab-btn, .gm-section-chip, .cn-edit-pick-row, .cn-edit-cancel, .folder-card, .salaries-type-btn";
 document.addEventListener("touchstart", (e) => {
   const el = e.target.closest(TAP_SELECTOR);
   if (el) el.classList.add("tap-active");

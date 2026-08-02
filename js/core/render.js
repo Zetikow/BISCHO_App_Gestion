@@ -725,6 +725,11 @@ function render() {
   // pouvoir s'ouvrir depuis n'importe quelle page (Accueil, Agenda...) — voir
   // renderEventDetailSheet dans agenda.js et window.__eventDetailId.
   if (window.__eventDetailId) html += renderEventDetailSheet();
+  // Fiche sélection en lecture seule (joueurs/parents) : ouverte depuis la carte d'un match sur
+  // n'importe quelle page (Accueil, Agenda...), pas seulement depuis l'onglet Sélection (réservé
+  // Coach/Admin) — voir renderPresenceSelectionViewSheet (presence.js) et
+  // window.__presSelectionViewFor.
+  if (window.__presSelectionViewFor) html += renderPresenceSelectionViewSheet();
 
   app.innerHTML = html;
   attachEvents();

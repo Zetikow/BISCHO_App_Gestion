@@ -159,11 +159,23 @@ tr.total-row td { font-weight: 800; background: #1a1710; color: #ffd23f; }
 
 .presence-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid #1a2030; }
 .presence-row:last-child { border-bottom: none; }
-.toggle-group { display: flex; gap: 6px; }
 .toggle-btn { padding: 9px 15px; border-radius: 10px; border: 1px solid #1c2333; background: #11141f; color: #e4e8f2; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: transform 0.12s, background 0.15s; }
 .toggle-btn:active, .toggle-btn.tap-active { transform: scale(0.94); }
 .toggle-btn.present { background: #1a7a3f; color: #fff; border-color: #1a7a3f; }
-.toggle-btn.absent { background: #b33; color: #fff; border-color: #b33; }
+
+/* Bascule Présent/Absent — pilule segmentée unique (un seul conteneur, deux moitiés), pas deux
+   boutons colorés vert/rouge indépendants : fond légèrement encaissé par rapport à la carte
+   (#0c0f18 sur fond de carte #11141f/pres-card #0d1018), le côté actif rempli d'un dégradé aux
+   couleurs du club (--navy -> --accent) en texte blanc, l'autre juste en texte gris atténué
+   (#8a92a8, la même teinte que team-switch-btn/mode-tab-btn inactifs) — se lit comme un
+   interrupteur à deux états, pas comme deux actions distinctes. Voir agenda.js
+   (renderNextEventCard/renderEventCard/renderEventDetailSheet) et presence.js
+   (renderPresenceRosterSheet). */
+.pres-toggle { display: flex; gap: 2px; background: #0c0f18; border: 1px solid #1c2333; border-radius: 12px; padding: 3px; }
+.pres-toggle-option { flex: 1; text-align: center; padding: 8px 10px; border: none; border-radius: 9px; background: transparent; color: #8a92a8; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: transform 0.12s, background 0.2s, color 0.2s; }
+.pres-toggle-option:active, .pres-toggle-option.tap-active { transform: scale(0.96); }
+.pres-toggle-option.active { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; }
+.nc-actions .pres-toggle { flex: 1; }
 
 /* Même principe que #app::before : le flou vit dans un pseudo-élément séparé du contenu (la
    carte de connexion), pas sur .login-wrap directement. */
@@ -344,6 +356,11 @@ body.login-mode .login-wrap { flex: 1; min-height: 0; }
 .composition-card-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 7px 12px; border-radius: 9px; background: #1a1f30; border: 1px solid #2a3350; color: #e4e8f2; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer; }
 .composition-card-btn.view { background: rgba(var(--accent-rgb),0.12); border-color: rgba(var(--accent-rgb),0.4); color: var(--accent2); }
 .composition-not-selected-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 6px 11px; border-radius: 20px; background: #1a1f30; border: 1px solid #2a3350; color: #8a8f9e; font-size: 11px; font-weight: 700; }
+/* Badge Sélectionné/Non sélectionné — remplace le toggle Présent/Absent sur la carte d'un match
+   une fois la Sélection publiée (voir selectionStatusFor, presence.js + agenda.js). */
+.selection-status-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 6px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.selection-status-badge.selected { background: rgba(var(--accent-rgb),0.18); border: 1px solid rgba(var(--accent-rgb),0.5); color: var(--accent2); }
+.selection-status-badge.not-selected { background: #1a1f30; border: 1px solid #2a3350; color: #8a8f9e; }
 
 .composition-overlay { z-index: 96; }
 @media (min-width: 700px) {

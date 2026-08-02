@@ -467,12 +467,19 @@ function renderNextEventCard() {
   const diffDays = Math.round((evDate - now) / (1000 * 60 * 60 * 24));
   const countdownLabel = diffDays <= 0 ? "Aujourd'hui" : diffDays === 1 ? "Demain" : `Dans ${diffDays} jours`;
 
+  // Une fois la Sélection publiée pour ce match, on ne redemande plus Présent/Absent : le
+  // joueur voit juste s'il a été retenu ou non (voir selectionStatusFor, presence.js).
+  const selStatus = selectionStatusFor(ev, presIdentity.nom);
   let actionsHtml = "";
   if (!hasRole("Bénévole")) {
-    if (presIdentity.editable) {
+    if (selStatus) {
+      actionsHtml = `<div class="nc-actions"><div class="selection-status-badge ${selStatus === 'selected' ? 'selected' : 'not-selected'}">${selStatus === 'selected' ? '✅ Sélectionné' : 'Non sélectionné'}</div></div>`;
+    } else if (presIdentity.editable) {
       actionsHtml = `<div class="nc-actions">
-        <button class="btn ${val === 'Oui' ? '' : 'secondary'}" data-event-presence="${id}" data-event-val="1">Présent</button>
-        <button class="btn secondary" style="${val === 'Non' ? 'background:#b33;color:#fff;' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+        <div class="pres-toggle">
+          <button type="button" class="pres-toggle-option ${val === 'Oui' ? 'active' : ''}" data-event-presence="${id}" data-event-val="1">Présent</button>
+          <button type="button" class="pres-toggle-option ${val === 'Non' ? 'active' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+        </div>
       </div>`;
     } else {
       const statusLabel = val === "Oui" ? "✅ Présent" : val === "Non" ? "❌ Absent" : "⏳ Pas encore répondu";
@@ -509,6 +516,9 @@ function renderEventDetailSheet() {
   const presIdentity = myPresenceIdentity();
   const val = presenceEvenements[`${id}_${presIdentity.nom}`];
   const isPast = eventDateObj(ev) < new Date();
+  // Une fois la Sélection publiée pour ce match, on ne redemande plus Présent/Absent : le
+  // joueur voit juste s'il a été retenu ou non (voir selectionStatusFor, presence.js).
+  const selStatus = selectionStatusFor(ev, presIdentity.nom);
 
   let presentCount = 0, absentCount = 0;
   const allNames = [...PLAYERS, "Coach", "Admin", "Bénévole"];
@@ -549,6 +559,11 @@ function renderEventDetailSheet() {
       <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
       <div><b>${presentCount} présent${presentCount > 1 ? "s" : ""} · ${absentCount} absent${absentCount > 1 ? "s" : ""}</b><span>Réponses reçues</span></div>
     </div>`;
+  } else if (!hasRole("Bénévole") && selStatus) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><b>${selStatus === 'selected' ? '✅ Sélectionné' : 'Non sélectionné'}</b><span>Sélection pour ce match</span></div>
+    </div>`;
   } else if (!hasRole("Bénévole")) {
     const statusLabel = val === "Oui" ? "✅ Présent" : val === "Non" ? "❌ Absent" : "⏳ Pas encore répondu";
     html += `<div class="sheet-row">
@@ -566,10 +581,21 @@ function renderEventDetailSheet() {
     <div style="padding-left:43px; margin-top:-4px;">${compoButtons}</div>`;
   }
 
-  if (!isPast && !hasRole("Bénévole") && presIdentity.editable && !compositionNonSelected(ev, presIdentity.nom)) {
-    html += `<div class="row-flex" style="margin-top:8px;">
-      <button class="sheet-cta ${val === 'Oui' ? '' : 'secondary'}" style="flex:1;" data-event-presence="${id}" data-event-val="1">Présent</button>
-      <button class="sheet-cta secondary" style="flex:1; ${val === 'Non' ? 'background:rgba(255,90,90,0.16); border-color:rgba(255,90,90,0.4); color:#ff8a8a;' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+  const selectionButton = renderSelectionCardButton(ev);
+  if (selectionButton) {
+    html += `<div class="sheet-row">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+      <div style="flex:1;"><b>Sélection</b><span>Publiée aux joueurs</span></div>
+    </div>
+    <div style="padding-left:43px; margin-top:-4px;">${selectionButton}</div>`;
+  }
+
+  if (!isPast && !hasRole("Bénévole") && presIdentity.editable && !selStatus && !compositionNonSelected(ev, presIdentity.nom)) {
+    html += `<div style="margin-top:8px;">
+      <div class="pres-toggle">
+        <button type="button" class="pres-toggle-option ${val === 'Oui' ? 'active' : ''}" data-event-presence="${id}" data-event-val="1">Présent</button>
+        <button type="button" class="pres-toggle-option ${val === 'Non' ? 'active' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+      </div>
     </div>`;
   }
 
@@ -755,6 +781,9 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
   const d = eventDateObj(ev);
   const presIdentity = myPresenceIdentity();
   const val = presenceEvenements[`${id}_${presIdentity.nom}`];
+  // Une fois la Sélection publiée pour ce match, on ne redemande plus Présent/Absent : le
+  // joueur voit juste s'il a été retenu ou non (voir selectionStatusFor, presence.js).
+  const selStatus = selectionStatusFor(ev, presIdentity.nom);
   let presentCount = 0, absentCount = 0;
   const allNames = [...PLAYERS, "Coach", "Admin", "Bénévole"];
   allNames.forEach(n => {
@@ -840,15 +869,18 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
         <div class="ev-meta">${lieu || ""}${canManage ? (lieu ? " · " : "") + presentCount + " présents / " + absentCount + " absents" : ""}</div>
       </div>
       ${(!isPast && !hasRole("Bénévole")) ? (
-        compositionNonSelected(ev, presIdentity.nom)
-          ? `<div class="composition-not-selected-badge">🔒 Non sélectionné</div>`
-          : (presIdentity.editable ? `<div class="toggle-group" style="margin-top:8px;">
-        <button class="toggle-btn ${val === 'Oui' ? 'present' : ''}" data-event-presence="${id}" data-event-val="1">Présent</button>
-        <button class="toggle-btn ${val === 'Non' ? 'absent' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
+        selStatus
+          ? `<div class="selection-status-badge ${selStatus === 'selected' ? 'selected' : 'not-selected'}">${selStatus === 'selected' ? '✅ Sélectionné' : 'Non sélectionné'}</div>`
+          : (compositionNonSelected(ev, presIdentity.nom)
+            ? `<div class="composition-not-selected-badge">🔒 Non sélectionné</div>`
+            : (presIdentity.editable ? `<div class="pres-toggle" style="margin-top:8px;">
+        <button type="button" class="pres-toggle-option ${val === 'Oui' ? 'active' : ''}" data-event-presence="${id}" data-event-val="1">Présent</button>
+        <button type="button" class="pres-toggle-option ${val === 'Non' ? 'active' : ''}" data-event-presence="${id}" data-event-val="0">Absent</button>
       </div>
-      ${val === 'Non' ? renderJustifBlock(id) : ""}` : `<div class="muted" style="margin-top:8px; font-size:11.5px;">Présence de ${escapeHtml(presIdentity.nom)} : ${val === "Oui" ? "✅ Présent" : val === "Non" ? "❌ Absent" : "⏳ Pas encore répondu"}</div>`)
+      ${val === 'Non' ? renderJustifBlock(id) : ""}` : `<div class="muted" style="margin-top:8px; font-size:11.5px;">Présence de ${escapeHtml(presIdentity.nom)} : ${val === "Oui" ? "✅ Présent" : val === "Non" ? "❌ Absent" : "⏳ Pas encore répondu"}</div>`))
       ) : ""}
       ${renderCompositionCardButtons(ev)}
+      ${renderSelectionCardButton(ev)}
     </div>
   </div>`;
 }
