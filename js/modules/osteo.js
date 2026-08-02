@@ -43,9 +43,11 @@ function renderOsteoPage() {
   if (isManager && tab === "dispo") {
     html += `<div class="section-h" style="margin-top:22px;">Gestion des créneaux</div>`;
     html += renderOsteoManagerView();
+    html += renderOsteoClientsSection();
   }
 
   html += renderAddOsteoSlotSheet();
+  html += renderOsteoClientDetailSheet();
 
   return html;
 }
@@ -219,6 +221,78 @@ function renderOsteoManagerView() {
   return html;
 }
 
+// ===================== MES CLIENTS EXTERNES (Eve/Admin) =====================
+// Historique + notes privées par personne externe (voir api_getExterneClientsHistory, Osteo.gs).
+// Chargé une seule fois par session (voir attachOsteoEvents), pas dans renderOsteoManagerView
+// (le rendu ne doit jamais déclencher lui-même un appel réseau) — window.__osteoClientsState
+// suit le même schéma que supportHistoryState (support.js) : {loading, loaded, attempted, clients}.
+function renderOsteoClientsSection() {
+  const st = window.__osteoClientsState || { loading: false, loaded: false, attempted: false, clients: [] };
+  let html = `<div class="section-h" style="margin-top:22px;">Mes clients externes</div>`;
+  if (st.loading && !st.loaded) {
+    html += `<div class="card"><div class="muted">Chargement…</div></div>`;
+    return html;
+  }
+  if (st.clients.length === 0) {
+    html += `<div class="card"><div class="muted">Aucun client externe pour le moment.</div></div>`;
+    return html;
+  }
+  st.clients.forEach(c => {
+    html += `<div class="card sheet-open-zone" data-open-osteo-client="${escapeHtml(c.nom)}" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-weight:700; color:#fff;">${escapeHtml(c.nom)}</div>
+        <div class="badge">${c.reservations.length} RDV</div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+// Fiche (bottom sheet) d'un client externe : tout son historique de RDV (passés et à venir),
+// avec pour chacun une note privée éditable (jamais visible par le client) — voir
+// window.__osteoClientDetail, ouvert depuis renderOsteoClientsSection ci-dessus.
+function renderOsteoClientDetailSheet() {
+  const nom = window.__osteoClientDetail;
+  if (!nom) return "";
+  const st = window.__osteoClientsState || { clients: [] };
+  const client = st.clients.find(c => c.nom === nom);
+  if (!client) return "";
+
+  let html = `<div class="sheet-overlay open" data-close-sheet="osteoClientDetail">
+    <div class="sheet-scrim" data-close-sheet="osteoClientDetail"></div>
+    <div class="sheet">
+      <div class="sheet-close" data-close-sheet="osteoClientDetail">✕</div>
+      <div class="sheet-grab"></div>
+      <div class="sheet-hero">
+        <div class="sheet-hero-eyebrow">Client externe</div>
+        <h2>${escapeHtml(nom)}</h2>
+        <p>${client.reservations.length} rendez-vous${client.email ? " · " + escapeHtml(client.email) : ""}</p>
+      </div>
+      <div class="sheet-body">`;
+
+  if (client.reservations.length === 0) {
+    html += `<div class="muted">Aucun rendez-vous enregistré pour ce client.</div>`;
+  } else {
+    client.reservations.forEach(r => {
+      const d = new Date(r.date + "T" + (r.heure || "00:00"));
+      const dateLabel = isNaN(d.getTime()) ? r.date : d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+      html += `<div class="add-form" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:700; color:#fff;">${escapeHtml(dateLabel)}</div>
+          <div class="muted" style="font-size:11px;">${escapeHtml(r.heure || "")}${r.lieu ? " · " + escapeHtml(r.lieu) : ""}</div>
+        </div>
+        ${r.motif ? `<div class="muted" style="font-size:11px; margin-top:6px;">Motif indiqué : ${escapeHtml(r.motif)}</div>` : ""}
+        <label class="field-label">Tes notes (privées, jamais visibles par le client)</label>
+        <textarea id="osteo-note-${escapeHtml(r.slotId)}" rows="3" placeholder="Notes de suivi...">${escapeHtml(r.notesEve || "")}</textarea>
+        <button class="btn secondary" style="margin-top:8px;" data-osteo-save-note="${escapeHtml(r.slotId)}|||${escapeHtml(nom)}">Enregistrer la note</button>
+      </div>`;
+    });
+  }
+
+  html += `</div></div></div>`;
+  return html;
+}
+
 // Petit formulaire (repliable) pour créer le compte d'une personne externe au club, suivie par
 // Eve en dehors du cadre du club (ex: ancien joueur, connaissance). Visible seulement ici, dans
 // la vue manager Ostéo (Eve/Admin) — jamais côté joueurs. La personne créée réserve ensuite ses
@@ -331,7 +405,54 @@ async function addExterneAccountApi(nom) {
   }
 }
 
+// Charge l'historique des clients externes (voir renderOsteoClientsSection) — une seule fois par
+// session, déclenché depuis attachOsteoEvents (jamais depuis un render(), qui ne doit jamais
+// causer lui-même un appel réseau). "attempted" évite une boucle de re-tentative infinie si
+// l'appel échoue (hors ligne) : il faudra recharger la page pour retenter, comme un échec de
+// fetchAll classique.
+async function fetchOsteoClientsHistory() {
+  window.__osteoClientsState = { loading: true, loaded: false, attempted: true, clients: (window.__osteoClientsState || {}).clients || [] };
+  render();
+  try {
+    const params = new URLSearchParams({ action: "getExterneClientsHistory", authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) window.__osteoClientsState = { loading: false, loaded: true, attempted: true, clients: data.clients || [] };
+    else window.__osteoClientsState.loading = false;
+  } catch (err) {
+    window.__osteoClientsState.loading = false;
+  }
+  render();
+}
+
+// Enregistre la note privée d'Eve sur une réservation précise (voir api_setOsteoReservationNote,
+// Osteo.gs). Mise à jour optimiste de l'état déjà chargé pour un retour visuel immédiat, sans
+// render() supplémentaire après l'appel réussi (la fiche reste ouverte avec ce que l'utilisatrice
+// vient de taper, pas besoin de reconstruire le HTML pour ça — seul le toast donne le retour).
+async function saveOsteoReservationNoteApi(slotId, nom, note) {
+  const state = window.__osteoClientsState;
+  if (state && state.clients) {
+    const client = state.clients.find(c => c.nom === nom);
+    const resa = client && client.reservations.find(r => r.slotId === slotId);
+    if (resa) resa.notesEve = note;
+  }
+  try {
+    const params = new URLSearchParams({ action: "setOsteoReservationNote", slotId, nom, note, authNom: session.nom, authCode: session.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    showToast(data.ok ? "Note enregistrée" : "Échec de l'enregistrement", data.ok ? "success" : "error");
+  } catch (err) {
+    isOnline = false;
+    showToast("Échec de l'enregistrement (hors ligne ?)", "error");
+  }
+}
+
 function attachOsteoEvents() {
+  const isManager = hasRole("Ostéo") || hasRole("Admin");
+  if (isManager && currentPage === "osteo" && !(window.__osteoClientsState && window.__osteoClientsState.attempted)) {
+    fetchOsteoClientsHistory();
+  }
+
   document.querySelectorAll("[data-osteo-tab]").forEach(el => {
     el.onclick = () => { vibrate(); window.__osteoTab = el.dataset.osteoTab; window.__osteoReserveSlotId = null; render(); };
   });
@@ -437,4 +558,18 @@ function attachOsteoEvents() {
     vibrate();
     addExterneAccountApi(nom);
   };
+
+  document.querySelectorAll("[data-open-osteo-client]").forEach(el => {
+    el.onclick = () => { vibrate(); window.__osteoClientDetail = el.dataset.openOsteoClient; render(); };
+  });
+
+  document.querySelectorAll("[data-osteo-save-note]").forEach(el => {
+    el.onclick = () => {
+      const [slotId, nom] = el.dataset.osteoSaveNote.split("|||");
+      const textarea = document.getElementById("osteo-note-" + slotId);
+      const note = textarea ? textarea.value : "";
+      vibrate();
+      saveOsteoReservationNoteApi(slotId, nom, note);
+    };
+  });
 }
