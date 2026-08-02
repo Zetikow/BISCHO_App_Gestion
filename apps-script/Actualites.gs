@@ -27,8 +27,33 @@ function api_addActualite(ss, e) {
   const sheet = ss.getSheetByName("Actualites");
   const id = "a" + Date.now() + "_" + Math.floor(Math.random() * 1000);
   const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
-  sheet.appendRow([id, e.parameter.titre || "", scope, e.parameter.texte || "", e.parameter.authNom, dateStr]);
+  const titre = e.parameter.titre || "";
+  sheet.appendRow([id, titre, scope, e.parameter.texte || "", e.parameter.authNom, dateStr]);
+
+  notifyActualitePush(ss, titre, scope);
+
   return jsonOut({ ok: true, id });
+}
+
+// Notifie selon la même portée que la visibilité (voir visibleActualites() dans
+// js/modules/actualites.js) : "Générale" touche tout le monde ayant un jeton ; une actu par
+// équipe touche les Joueur/Coach/Parent de cette équipe, PLUS Admin/Salarié/Ostéo qui voient
+// toutes les portées quel que soit leur équipe. Jamais bloquant pour la publication elle-même.
+function notifyActualitePush(ss, titre, scope) {
+  try {
+    const body = `"${titre}" vient d'être publiée sur LustuZone.`;
+    let tokens;
+    if (scope === "Générale") {
+      tokens = pushTokensAll(ss);
+    } else {
+      const teamTokens = pushTokensForEquipe(ss, scope, ["Joueur", "Coach"], true);
+      const broadTokens = [].concat(pushTokensForRole(ss, "Admin"), pushTokensForRole(ss, "Salarié"), pushTokensForRole(ss, "Ostéo"));
+      tokens = Array.from(new Set(teamTokens.concat(broadTokens)));
+    }
+    tokens.forEach(token => sendPushNotification(token, "📰 Nouvelle actualité", body));
+  } catch (err) {
+    Logger.log("Erreur notif push nouvelle actualité : " + err);
+  }
 }
 
 function api_deleteActualite(ss, e) {

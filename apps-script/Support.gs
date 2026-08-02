@@ -71,6 +71,17 @@ function api_sendSupportMessage(ss, e) {
   } catch (err) {
     Logger.log("Erreur enregistrement suivi support : " + err); // le mail est déjà parti, pas bloquant
   }
+
+  // Notifie les Admin (seule audience qui peut voir les demandes, voir api_getAllSupportRequests
+  // ci-dessous) — jamais bloquant pour l'envoi de la demande elle-même.
+  try {
+    const tokens = pushTokensForRole(ss, "Admin");
+    const body = `${e.parameter.authNom} a envoyé une question via Support.`;
+    tokens.forEach(token => sendPushNotification(token, "💬 Nouvelle demande support", body));
+  } catch (err) {
+    Logger.log("Erreur notif push nouvelle demande support : " + err);
+  }
+
   return jsonOut({ ok: true });
 }
 
@@ -124,8 +135,13 @@ function api_replySupportMessage(ss, e) {
       ensureComptesSchema(comptesSheet);
       const comptesData = comptesSheet.getDataRange().getValues();
       let auteurEmail = "";
+      let auteurToken = "";
       for (let k = 1; k < comptesData.length; k++) {
-        if (comptesData[k][COL_NOM] === nomAuteur) { auteurEmail = comptesData[k][COL_EMAIL] || ""; break; }
+        if (comptesData[k][COL_NOM] === nomAuteur) {
+          auteurEmail = comptesData[k][COL_EMAIL] || "";
+          auteurToken = comptesData[k][COL_PUSHSUBIDS] || "";
+          break;
+        }
       }
       if (auteurEmail) {
         try {
@@ -134,6 +150,7 @@ function api_replySupportMessage(ss, e) {
             { name: "LustuZone — Support" });
         } catch (err) { /* pas bloquant */ }
       }
+      if (auteurToken) sendPushNotification(auteurToken, "💬 Réponse reçue", "On a répondu à ta question dans Support.");
       return jsonOut({ ok: true });
     }
   }
