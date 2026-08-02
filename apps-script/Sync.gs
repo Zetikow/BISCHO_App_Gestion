@@ -35,7 +35,13 @@ function api_getAll(ss, e) {
     return copy;
   });
   const osteoReservationsSheet = ss.getSheetByName("OsteoReservations");
-  const osteoReservations = osteoReservationsSheet ? osteoReservationsSheet.getDataRange().getValues() : [];
+  if (osteoReservationsSheet) ensureOsteoReservationsSchema(osteoReservationsSheet);
+  const osteoReservationsRaw = osteoReservationsSheet ? osteoReservationsSheet.getDataRange().getValues() : [];
+  // Ne renvoie JAMAIS la colonne "NotesEve" (notes privées d'Eve, voir Osteo.gs) via ce endpoint
+  // générique chargé par absolument tout le monde (joueurs compris) — seul le endpoint dédié et
+  // restreint api_getExterneClientsHistory (réservé à Ostéo/Admin) l'expose, comme pour les codes
+  // PIN de "Comptes" juste au-dessus.
+  const osteoReservations = osteoReservationsRaw.map(row => row.slice(0, 3));
   const compositionsSheet = ss.getSheetByName("Compositions");
   const compositions = compositionsSheet ? compositionsSheet.getDataRange().getValues() : [];
   const compositionsMetaSheet = ss.getSheetByName("CompositionsMeta");

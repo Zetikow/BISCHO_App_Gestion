@@ -26,14 +26,32 @@ function setupOsteoSlots() {
 
 // Réservations : une ligne par créneau réservé. Motif = raison de consultation, strictement
 // privée (jamais montrée aux autres joueurs, seulement à Eve et à la personne concernée).
+// NotesEve (4e colonne, voir ensureOsteoReservationsSchema ci-dessous) = notes de suivi propres
+// à Eve sur cette réservation précise, jamais montrées à la personne qui a réservé, ni à qui que
+// ce soit d'autre (même pas via api_getAll — voir Sync.gs, qui tronque volontairement cette
+// colonne pour ce endpoint générique chargé par tout le monde).
 function setupOsteoReservations() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("OsteoReservations");
   if (!sheet) sheet = ss.insertSheet("OsteoReservations");
   if (sheet.getDataRange().getNumRows() <= 1) {
-    sheet.getRange(1, 1, 1, 3).setValues([["SlotID", "Nom", "Motif"]]);
-    sheet.getRange(1, 1, 1, 3).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, 4).setValues([["SlotID", "Nom", "Motif", "NotesEve"]]);
+    sheet.getRange(1, 1, 1, 4).setFontWeight("bold");
     sheet.setFrozenRows(1);
+  }
+}
+
+// Ajoute la colonne "NotesEve" si la feuille "OsteoReservations" existait déjà avant son
+// introduction (une ligne par réservation, avant elle n'avait que SlotID/Nom/Motif) — même
+// idiome que ensureComptesSchema (Auth.gs) / ensureEvenementsScoreColumn (Evenements.gs) /
+// ensurePresenceEvenementsSchema (Presences.gs). À appeler en tête de tout handler qui lit ou
+// écrit "OsteoReservations", pour qu'un club sur une feuille encore à 3 colonnes migre sans
+// aucune manipulation manuelle du Google Sheet.
+function ensureOsteoReservationsSchema(sheet) {
+  const header = sheet.getRange(1, 1, 1, 4).getValues()[0];
+  if (header[3] !== "NotesEve") {
+    sheet.getRange(1, 4).setValue("NotesEve");
+    sheet.getRange(1, 4).setFontWeight("bold");
   }
 }
 
@@ -99,6 +117,7 @@ function sendOsteoReminders() {
   const comptesSheet = ss.getSheetByName("Comptes");
   if (!slotsSheet || !resaSheet || !comptesSheet) return;
   ensureComptesSchema(comptesSheet);
+  ensureOsteoReservationsSchema(resaSheet);
 
   const tz = Session.getScriptTimeZone();
   const tomorrow = new Date();
@@ -207,6 +226,7 @@ function api_reserveOsteoSlot(ss, e) {
   const slotId = e.parameter.slotId;
   const motif = e.parameter.motif || "";
   const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
   const data = resaSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === slotId) return jsonOut({ ok: false, error: "already_taken" });
@@ -228,6 +248,7 @@ function api_cancelOsteoReservation(ss, e) {
   setupOsteoReservations();
   const slotId = e.parameter.slotId;
   const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
   const data = resaSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === slotId && data[i][1] === nom) {
@@ -312,6 +333,7 @@ function api_reassignOsteoSlotPriority(ss, e) {
   const newNom = e.parameter.newNom;
   const message = (e.parameter.message || "").trim();
   const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
   const data = resaSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === slotId) { resaSheet.deleteRow(i + 1); break; }
@@ -360,6 +382,7 @@ function api_deleteOsteoSlot(ss, e) {
     if (slotsData[i][0] === slotId) { slotsSheet.deleteRow(i + 1); break; }
   }
   const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
   const resaData = resaSheet.getDataRange().getValues();
   for (let i = 1; i < resaData.length; i++) {
     if (resaData[i][0] === slotId) { resaSheet.deleteRow(i + 1); break; }
@@ -424,8 +447,10 @@ function api_getOsteoExterneData(ss, e) {
 
   setupOsteoSlots();
   setupOsteoReservations();
+  const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
   const slotsData = ss.getSheetByName("OsteoSlots").getDataRange().getValues();
-  const resaData = ss.getSheetByName("OsteoReservations").getDataRange().getValues();
+  const resaData = resaSheet.getDataRange().getValues();
   const tz = Session.getScriptTimeZone();
 
   const reservedSlotIds = new Set();
@@ -466,4 +491,82 @@ function api_getOsteoExterneData(ss, e) {
   }
 
   return jsonOut({ ok: true, slots: slots, mesReservations: mesReservations });
+}
+
+// Réservé à Ostéo/Admin : enregistre la note privée d'Eve sur une réservation précise (colonne
+// "NotesEve", jamais visible par la personne qui a réservé — voir ensureOsteoReservationsSchema
+// plus haut et api_getExterneClientsHistory ci-dessous pour la lecture). Identifie la ligne par
+// slotId + nom (comme partout ailleurs dans ce fichier), pas par un ID de réservation dédié —
+// cohérent avec le reste du schéma "OsteoReservations".
+function api_setOsteoReservationNote(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!hasRole(role, "Ostéo") && !hasRole(role, "Admin")) return jsonOut({ ok: false, error: "forbidden" });
+  setupOsteoReservations();
+  const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
+  const slotId = e.parameter.slotId;
+  const nom = e.parameter.nom;
+  const note = e.parameter.note || "";
+  const data = resaSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === slotId && data[i][1] === nom) {
+      resaSheet.getRange(i + 1, 4).setValue(note);
+      return jsonOut({ ok: true });
+    }
+  }
+  return jsonOut({ ok: false, error: "not_found" });
+}
+
+// Réservé à Ostéo/Admin : historique complet (passé ET à venir, du plus récent au plus ancien)
+// de chaque personne ayant le rôle "Externe", pour l'écran "Mes clients externes" d'Eve (voir
+// renderOsteoClientsSection dans js/modules/osteo.js). Inclut le motif ET la note privée d'Eve —
+// contrairement à api_getOsteoExterneData (utilisé par les externes eux-mêmes pour leurs PROPRES
+// réservations), qui n'a jamais accès à NotesEve. Contrairement aussi à api_getAll (Sync.gs), qui
+// tronque volontairement cette même colonne avant de la renvoyer à tout le monde.
+function api_getExterneClientsHistory(ss, e) {
+  const role = checkAuth(ss, e.parameter.authNom, e.parameter.authCode);
+  if (!hasRole(role, "Ostéo") && !hasRole(role, "Admin")) return jsonOut({ ok: false, error: "forbidden" });
+
+  const comptesSheet = ss.getSheetByName("Comptes");
+  ensureComptesSchema(comptesSheet);
+  const comptesData = comptesSheet.getDataRange().getValues();
+
+  setupOsteoSlots();
+  setupOsteoReservations();
+  const resaSheet = ss.getSheetByName("OsteoReservations");
+  ensureOsteoReservationsSchema(resaSheet);
+  const resaData = resaSheet.getDataRange().getValues();
+  const slotsData = ss.getSheetByName("OsteoSlots").getDataRange().getValues();
+  const tz = Session.getScriptTimeZone();
+
+  const slotById = {};
+  for (let i = 1; i < slotsData.length; i++) {
+    if (slotsData[i][0]) slotById[slotsData[i][0]] = slotsData[i];
+  }
+
+  const clients = [];
+  for (let i = 1; i < comptesData.length; i++) {
+    const row = comptesData[i];
+    if (!row[COL_NOM] || !rowHasRole(row, "Externe")) continue;
+    const nom = row[COL_NOM];
+    const email = row[COL_EMAIL] || "";
+    const reservations = [];
+    for (let j = 1; j < resaData.length; j++) {
+      if (resaData[j][1] !== nom) continue;
+      const slot = slotById[resaData[j][0]];
+      if (!slot) continue;
+      reservations.push({
+        slotId: resaData[j][0],
+        date: slot[1] instanceof Date ? Utilities.formatDate(slot[1], tz, "yyyy-MM-dd") : String(slot[1] || ""),
+        heure: slot[2] instanceof Date ? Utilities.formatDate(slot[2], tz, "HH:mm") : String(slot[2] || ""),
+        lieu: slot[3] || "",
+        motif: resaData[j][2] || "",
+        notesEve: resaData[j][3] || "",
+      });
+    }
+    reservations.sort((a, b) => (b.date + "T" + b.heure).localeCompare(a.date + "T" + a.heure));
+    clients.push({ nom: nom, email: email, reservations: reservations });
+  }
+
+  return jsonOut({ ok: true, clients: clients });
 }
