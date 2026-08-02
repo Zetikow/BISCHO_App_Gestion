@@ -189,6 +189,28 @@ function api_setGridCell(ss, e) {
   const row = parseInt(e.parameter.row, 10);
   const col = parseInt(e.parameter.col, 10);
   const value = parseInt(e.parameter.value, 10);
+  const oldValue = Number(sheet.getRange(row, col).getValue()) || 0;
   sheet.getRange(row, col).setValue(value);
+
+  // Notifie le joueur seulement quand une NOUVELLE occurrence est ajoutée (compteur en hausse) —
+  // pas sur une correction/suppression (compteur stable ou en baisse, ex: édition depuis la vue
+  // détaillée). C'est le seul signal disponible ici : le endpoint reçoit juste row/col/value,
+  // sans distinguer "ajout" et "édition" côté appel (voir writeCell dans caisse-noire.js, utilisé
+  // par les deux). Jamais bloquant pour l'écriture elle-même.
+  if (value > oldValue) {
+    try {
+      const actionLabel = sheet.getRange(row, 1).getValue();
+      const actionValeur = Number(sheet.getRange(row, 2).getValue()) || 0;
+      const nom = PLAYERS[col - 3];
+      if (nom && actionLabel) {
+        const montant = (value - oldValue) * actionValeur;
+        const token = pushTokenForNom(ss, nom);
+        if (token) sendPushNotification(token, "💰 Caisse noire", `Nouvelle action : "${actionLabel}" (+${montant}€).`);
+      }
+    } catch (err) {
+      Logger.log("Erreur notif push caisse noire : " + err);
+    }
+  }
+
   return jsonOut({ ok: true });
 }

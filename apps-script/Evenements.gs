@@ -198,21 +198,65 @@ function api_updateEvenement(ss, e) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === id) {
       const row = i + 1;
-      setEvenementCell(sheet.getRange(row, 2), e.parameter.date || "");
-      setEvenementCell(sheet.getRange(row, 3), e.parameter.heure || "");
+      const before = data[i]; // état AVANT écriture, pour détecter un changement d'horaire/lieu ci-dessous
+      const newDate = e.parameter.date || "";
+      const newHeure = e.parameter.heure || "";
+      const newLieu = e.parameter.lieu || "";
+      setEvenementCell(sheet.getRange(row, 2), newDate);
+      setEvenementCell(sheet.getRange(row, 3), newHeure);
       sheet.getRange(row, 4).setValue(e.parameter.type || "Autre");
       sheet.getRange(row, 5).setValue(e.parameter.titre || "");
-      sheet.getRange(row, 6).setValue(e.parameter.lieu || "");
+      sheet.getRange(row, 6).setValue(newLieu);
       if (Object.prototype.hasOwnProperty.call(e.parameter, "equipe")) {
         sheet.getRange(row, 7).setValue(e.parameter.equipe || "SM1");
       }
       if (Object.prototype.hasOwnProperty.call(e.parameter, "score")) {
         sheet.getRange(row, 8).setValue(e.parameter.score || "");
       }
+
+      notifyEvenementUpdatedPush(ss, before, newDate, newHeure, newLieu, e.parameter.type, e.parameter.equipe);
+
       return jsonOut({ ok: true });
     }
   }
   return jsonOut({ ok: false, error: "not_found" });
+}
+
+// Notifie l'équipe si la date, l'heure ou le lieu a changé (jamais pour un simple changement de
+// titre/score) — jamais bloquant pour la modification de l'événement elle-même.
+function notifyEvenementUpdatedPush(ss, before, newDate, newHeure, newLieu, newType, newEquipeParam) {
+  try {
+    const oldDate = String(before[1] || "");
+    const oldHeure = String(before[2] || "");
+    const oldLieu = String(before[5] || "");
+    const dateChanged = oldDate !== newDate;
+    const heureChanged = oldHeure !== newHeure;
+    const lieuChanged = oldLieu !== newLieu;
+    if (!dateChanged && !heureChanged && !lieuChanged) return;
+
+    const type = newType || before[3] || "Autre";
+    const equipe = newEquipeParam !== undefined ? (newEquipeParam || "SM1") : (before[6] || "SM1");
+    const estMatch = type === "Match";
+    const naturePhrase = estMatch ? `Le match ${equipe}` : `L'entraînement ${equipe}`;
+    const dateAff = formatDateFr(newDate);
+
+    let body;
+    if (heureChanged && !lieuChanged) {
+      body = `${naturePhrase} du ${dateAff} passe à ${newHeure} (au lieu de ${oldHeure || "heure non précisée"}).`;
+    } else if (lieuChanged && !heureChanged) {
+      body = `${naturePhrase} du ${dateAff} passe à ${newLieu} (au lieu de ${oldLieu || "lieu non précisé"}).`;
+    } else if (heureChanged && lieuChanged) {
+      body = `${naturePhrase} du ${dateAff} passe à ${newHeure}, ${newLieu} (au lieu de ${oldHeure || "?"}, ${oldLieu || "?"}).`;
+    } else {
+      // Seule la date a changé.
+      body = `${naturePhrase} est décalé du ${formatDateFr(oldDate)} au ${dateAff}.`;
+    }
+
+    const tokens = pushTokensForEquipe(ss, equipe, ["Joueur", "Coach"], true);
+    tokens.forEach(token => sendPushNotification(token, "🔄 Horaire modifié", body));
+  } catch (err) {
+    Logger.log("Erreur notif push changement horaire événement : " + err);
+  }
 }
 
 function api_deleteEvenement(ss, e) {
@@ -223,9 +267,39 @@ function api_deleteEvenement(ss, e) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === id) {
+      const evRow = data[i]; // capturé AVANT suppression, pour la notification (voir plus bas)
       sheet.deleteRow(i + 1);
+      notifyEvenementDeletedPush(ss, evRow);
       return jsonOut({ ok: true });
     }
   }
   return jsonOut({ ok: false, error: "not_found" });
+}
+
+// Notifie l'équipe concernée de l'annulation — jamais bloquant pour la suppression elle-même.
+function notifyEvenementDeletedPush(ss, evRow) {
+  try {
+    const type = evRow[3] || "Autre";
+    const dateAff = formatDateFr(evRow[1]);
+    const heureStr = evRow[2] || "";
+    const equipe = evRow[6] || "SM1";
+
+    let titre, naturePhrase;
+    if (type === "Match") {
+      titre = "🚫 Match annulé";
+      naturePhrase = "Le match";
+    } else if (type === "Entraînement") {
+      titre = "🚫 Entraînement annulé";
+      naturePhrase = "L'entraînement";
+    } else {
+      titre = "🚫 Événement annulé";
+      naturePhrase = "L'événement";
+    }
+    const body = `${naturePhrase} ${equipe} du ${dateAff} à ${heureStr} est annulé.`;
+
+    const tokens = pushTokensForEquipe(ss, equipe, ["Joueur", "Coach"], true);
+    tokens.forEach(token => sendPushNotification(token, titre, body));
+  } catch (err) {
+    Logger.log("Erreur notif push annulation événement : " + err);
+  }
 }
