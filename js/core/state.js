@@ -8,7 +8,7 @@ const LOGO_DATA_URI = "images/icon-512.png";
 const SESSION_KEY = "caisse-noire-session"; // {nom, role, code, equipe}
 const APP_VERSION_KEY = "caisse-noire-app-version";
 const LAST_USER_KEY = "lustuzone-last-user"; // simple mémorisation du dernier nom connecté sur cet appareil (pas le code)
-const APP_VERSION = "2026-08-02-4"; // À incrémenter à chaque mise à jour déployée
+const APP_VERSION = "2026-08-02-5"; // À incrémenter à chaque mise à jour déployée
 const SEASON_START = new Date(2026, 8, 1);  // 1er septembre 2026
 const SEASON_END = new Date(2027, 5, 30);   // 30 juin 2027
 
@@ -26,6 +26,7 @@ let osteoReservations = []; // [[slotId, nom, motif], ...] (+ header row)
 let compositions = []; // [[matchId, nom, zone, libreX, libreY], ...] — zone = poste fixe (GB/AiG/.../Banc5) ou "Libre"
 let compositionsMeta = []; // [[matchId, publie], ...] — publie = "1" une fois visible aux joueurs/parents
 let selections = []; // [[eventId, nom, selectionne], ...] — qui est retenu pour un match (SM1), réservé Coach/Admin
+let benevoles = []; // [[eventId, nom, present], ...] — qui s'est proposé bénévole pour un événement de type "Bénévole"
 let gouter = []; // [[eventId, nom, quoi], ...] (+ header row) — Gestion des matchs
 let tableMarque = []; // [[eventId, nom, disponible], ...] (+ header row)
 let maillots = []; // [[eventId, nom, pris], ...] (+ header row)
@@ -213,6 +214,12 @@ function findCompteRow(nom) {
 // Liste des joueurs d'une équipe donnée, à partir des comptes réels (plus de dépendance à PLAYERS).
 function rosterForEquipe(equipe) {
   return comptes.slice(1).filter(c => rowHasRole(c, "Joueur") && rowEquipesForRole(c, "Joueur").indexOf(equipe) !== -1).map(c => c[0]);
+}
+
+// Même idiome que rosterForEquipe mais pour le rôle "Bénévole" — sert à lister qui peut
+// s'inscrire comme bénévole pour une équipe donnée (voir renderPresenceBenevoleSheet).
+function benevolesForEquipe(equipe) {
+  return comptes.slice(1).filter(c => rowHasRole(c, "Bénévole") && rowEquipesForRole(c, "Bénévole").indexOf(equipe) !== -1).map(c => c[0]);
 }
 
 // Équipes qu'un compte peut consulter : toutes celles de ses rôles cumulés (ex: un joueur
