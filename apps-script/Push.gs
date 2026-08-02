@@ -111,6 +111,87 @@ function sendPushToAll(title, body) {
   return sent;
 }
 
+// ===================================================================
+// HELPERS DE CIBLAGE — utilisés par les notifications push déclenchées depuis les autres
+// fichiers .gs (Compositions, Selections, Osteo, Grid, Evenements, Actualites, Support,
+// Presences, PushReminders...) pour retrouver le/les jeton(s) push d'une ou plusieurs
+// personnes. Toujours de simples lectures de la feuille "Comptes" ; ne lèvent jamais d'erreur.
+// ===================================================================
+
+// Jeton push d'une personne précise, par son Nom exact (colonne "Nom" de Comptes). "" si la
+// personne n'existe pas ou n'a pas encore activé les notifications.
+function pushTokenForNom(ss, nom) {
+  const sheet = ss.getSheetByName("Comptes");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][COL_NOM]).trim() === String(nom).trim()) return data[i][COL_PUSHSUBIDS] || "";
+  }
+  return "";
+}
+
+// Jetons de TOUTES les personnes ayant le rôle donné (roleName), quelle que soit leur équipe —
+// utile pour "Ostéo", "Admin"... (rôles rattachés à la personne plutôt qu'à une équipe précise).
+function pushTokensForRole(ss, roleName) {
+  const sheet = ss.getSheetByName("Comptes");
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const tokens = [];
+  for (let i = 1; i < data.length; i++) {
+    if (rowHasRole(data[i], roleName) && data[i][COL_PUSHSUBIDS]) tokens.push(data[i][COL_PUSHSUBIDS]);
+  }
+  return tokens;
+}
+
+// Jetons de tous les comptes ayant un jeton enregistré, sans filtre de rôle — utilisé pour les
+// notifications à portée "Générale" (ex: actualité générale).
+function pushTokensAll(ss) {
+  const sheet = ss.getSheetByName("Comptes");
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const tokens = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][COL_PUSHSUBIDS]) tokens.push(data[i][COL_PUSHSUBIDS]);
+  }
+  return tokens;
+}
+
+// Jetons (dédupliqués) de toutes les personnes ayant un des rôles donnés (roleNames, ex:
+// ["Joueur","Coach"]) pour l'équipe précise, PLUS (si includeParents) les parents des joueurs de
+// cette équipe — un compte "Parent" stocke le NOM DE L'ENFANT dans le champ équipe de son rôle
+// (ex: "Parent:Thomas L."), pas un code d'équipe, voir le même idiome dans Covoiturage.gs/
+// Gouter.gs/Maillots.gs/TableMarque.gs (api_setCovoiturage et consorts).
+// Simplification assumée par rapport à primaryEquipe() (js/core/state.js) : un joueur multi-équipes
+// est notifié pour chacune de ses équipes, pas seulement sa "principale" — mieux vaut notifier en
+// trop qu'oublier quelqu'un de concerné.
+function pushTokensForEquipe(ss, equipe, roleNames, includeParents) {
+  const sheet = ss.getSheetByName("Comptes");
+  if (!sheet) return [];
+  const comptes = sheet.getDataRange().getValues();
+  const tokens = new Set();
+  const joueurNoms = new Set();
+  for (let i = 1; i < comptes.length; i++) {
+    const row = comptes[i];
+    if (rowHasRole(row, "Joueur") && rowEquipesForRole(row, "Joueur").indexOf(equipe) !== -1) {
+      joueurNoms.add(row[COL_NOM]);
+    }
+    const token = row[COL_PUSHSUBIDS];
+    if (!token) continue;
+    const matches = roleNames.some(roleName => rowHasRole(row, roleName) && rowEquipesForRole(row, roleName).indexOf(equipe) !== -1);
+    if (matches) tokens.add(token);
+  }
+  if (includeParents) {
+    for (let i = 1; i < comptes.length; i++) {
+      const row = comptes[i];
+      const token = row[COL_PUSHSUBIDS];
+      if (!token || !rowHasRole(row, "Parent")) continue;
+      const enfants = rowEquipesForRole(row, "Parent");
+      if (enfants.some(nomEnfant => joueurNoms.has(nomEnfant))) tokens.add(token);
+    }
+  }
+  return Array.from(tokens);
+}
+
 // À exécuter manuellement depuis l'éditeur (menu déroulant > testPushNotification > Exécuter)
 // pour vérifier que tout fonctionne de bout en bout, une fois les 3 Propriétés du script
 // renseignées ET qu'au moins un compte a cliqué "🔔 Activer les notifications" dans l'appli

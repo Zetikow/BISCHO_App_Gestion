@@ -233,10 +233,27 @@ function api_cancelOsteoReservation(ss, e) {
     if (data[i][0] === slotId && data[i][1] === nom) {
       resaSheet.deleteRow(i + 1);
       sendOsteoBookingNotifications(ss, slotId, nom, "", "cancel");
+      notifyOsteoCancelPush(ss, slotId, nom);
       return jsonOut({ ok: true });
     }
   }
   return jsonOut({ ok: false, error: "not_found" });
+}
+
+// Prévient par push toutes les personnes ayant le rôle Ostéo (il peut y en avoir plusieurs)
+// qu'un joueur a annulé son RDV — jamais bloquant pour l'annulation elle-même.
+function notifyOsteoCancelPush(ss, slotId, nom) {
+  try {
+    const slotsSheet = ss.getSheetByName("OsteoSlots");
+    const slot = slotsSheet.getDataRange().getValues().find(r => r[0] === slotId);
+    if (!slot) return;
+    const dateStr = slot[1] instanceof Date ? Utilities.formatDate(slot[1], Session.getScriptTimeZone(), "dd/MM/yyyy") : formatDateFr(slot[1]);
+    const heure = slot[2] instanceof Date ? Utilities.formatDate(slot[2], Session.getScriptTimeZone(), "HH:mm") : slot[2];
+    const tokens = pushTokensForRole(ss, "Ostéo");
+    tokens.forEach(token => sendPushNotification(token, "❌ RDV annulé", `${nom} a annulé son RDV du ${dateStr} à ${heure}.`));
+  } catch (err) {
+    Logger.log("Erreur notif push annulation ostéo : " + err);
+  }
 }
 
 // Prévient par mail Eve ET la personne concernée à chaque réservation/annulation de créneau

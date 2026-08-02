@@ -43,9 +43,29 @@ function api_setSelection(ss, e) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === eventId && data[i][1] === nom) {
       sheet.getRange(i + 1, 3).setValue(selectionne);
+      notifySelectionPush(ss, eventId, nom);
       return jsonOut({ ok: true });
     }
   }
   sheet.appendRow([eventId, nom, selectionne]);
+  notifySelectionPush(ss, eventId, nom);
   return jsonOut({ ok: true });
+}
+
+// Prévient le joueur qu'il est sélectionné pour un match — seulement à la sélection (jamais à
+// la désélection, voir les deux appels ci-dessus). Jamais bloquant pour la sélection elle-même.
+function notifySelectionPush(ss, eventId, nom) {
+  try {
+    const evSheet = ss.getSheetByName("Evenements");
+    const evData = evSheet.getDataRange().getValues();
+    const evRow = evData.find(r => r[0] === eventId);
+    if (!evRow) return;
+    const equipe = evRow[6] || "SM1";
+    const adversaire = extractOpponentFromTitre(evRow[4]) || evRow[4] || "";
+    const dateStr = formatDateFr(evRow[1]);
+    const token = pushTokenForNom(ss, nom);
+    if (token) sendPushNotification(token, "✅ Sélectionné", `Tu es sélectionné pour ${equipe} vs ${adversaire} le ${dateStr}.`);
+  } catch (err) {
+    Logger.log("Erreur notif push sélection : " + err);
+  }
 }

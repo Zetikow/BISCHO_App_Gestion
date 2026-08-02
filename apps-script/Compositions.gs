@@ -120,12 +120,35 @@ function api_publishComposition(ss, e) {
 
   const metaSheet = ss.getSheetByName("CompositionsMeta");
   const data = metaSheet.getDataRange().getValues();
+  let wasAlreadyPublished = false;
+  let found = false;
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === matchId) {
+      wasAlreadyPublished = data[i][1] === "1";
       metaSheet.getRange(i + 1, 2).setValue(publie);
-      return jsonOut({ ok: true });
+      found = true;
+      break;
     }
   }
-  metaSheet.appendRow([matchId, publie]);
+  if (!found) metaSheet.appendRow([matchId, publie]);
+
+  // Notifie joueurs + parents seulement au moment où la compo PASSE à publiée (jamais à une
+  // republication ni à une dépublication) — jamais bloquant pour la publication elle-même.
+  if (publie === "1" && !wasAlreadyPublished) {
+    try {
+      const evSheet = ss.getSheetByName("Evenements");
+      const evData = evSheet.getDataRange().getValues();
+      const evRow = evData.find(r => r[0] === matchId);
+      if (evRow) {
+        const equipe = evRow[6] || "SM1";
+        const adversaire = extractOpponentFromTitre(evRow[4]) || evRow[4] || "";
+        const tokens = pushTokensForEquipe(ss, equipe, ["Joueur"], true);
+        tokens.forEach(token => sendPushNotification(token, "🧩 Composition publiée", `La compo de ${equipe} vs ${adversaire} est en ligne !`));
+      }
+    } catch (err) {
+      Logger.log("Erreur notif push composition publiée : " + err);
+    }
+  }
+
   return jsonOut({ ok: true });
 }
