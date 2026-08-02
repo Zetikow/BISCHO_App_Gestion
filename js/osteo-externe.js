@@ -6,8 +6,15 @@
 // charger le code de l'appli principale. Elle parle au même backend
 // (GOOGLE_SCRIPT_URL, voir config/google-script-config.js) via les
 // actions déjà existantes (accountStatus, setCode, login,
-// reserveOsteoSlot, cancelOsteoReservation) plus une action dédiée,
-// minimale et privée, getOsteoExterneData (voir apps-script/Osteo.gs).
+// reserveOsteoSlot, cancelOsteoReservation, setEmail, sendSupportMessage,
+// getMySupportHistory) plus une action dédiée, minimale et privée,
+// getOsteoExterneData (voir apps-script/Osteo.gs).
+//
+// 4 onglets (nav du bas, voir oeRenderBottomNav) : Ostéo (créneaux/mes RDV,
+// contenu historique de cette page), Profil (nom/email/RDV passés), Support
+// (contact direct + historique), Consignes (mode d'emploi statique). Pas de
+// routage d'URL : un simple "currentView" en mémoire, plus léger que le
+// vrai système de pages de l'appli principale (pas besoin ici).
 // ===================================================================
 
 const OE_SESSION_KEY = "osteo-externe-session"; // {nom, code} — distinct de "caisse-noire-session"
@@ -21,10 +28,26 @@ let oeLoginError = "";
 let oeLoginBusy = false;
 
 // ----- État après connexion -----
-let oeData = null; // { slots, mesReservations }
+let oeCurrentView = "osteo"; // "osteo" | "profil" | "support" | "consignes"
+let oeData = null; // { slots, mesReservations, moi:{nom,email,rdvPasses} }
 let oeLoadError = "";
 let oeReservingSlotId = null; // slot pour lequel la boîte "motif" est ouverte
 let oeBusy = false; // désactive les boutons pendant un appel réseau
+
+// ----- État onglet Profil -----
+let oeProfilEmailEditing = false;
+
+// ----- État onglet Support -----
+let oeSupportHistoryState = { loading: false, loaded: false, history: [] };
+let oeSupportSending = false;
+let oeSupportSent = false;
+
+const OE_TABS = [
+  { id: "osteo", label: "Ostéo", icon: "🩺" },
+  { id: "profil", label: "Profil", icon: "👤" },
+  { id: "support", label: "Support", icon: "💬" },
+  { id: "consignes", label: "Infos", icon: "📖" },
+];
 
 function oeEscapeHtml(str) {
   return String(str == null ? "" : str)
@@ -56,6 +79,7 @@ function oeDateLabel(dateStr, heureStr) {
 function oeRender() {
   const root = document.getElementById("oe-shell");
   if (!root) return;
+  root.classList.toggle("oe-with-nav", !!oeSession); // laisse la place à la nav du bas une fois connecté
   root.innerHTML = oeSession ? oeRenderMain() : oeRenderLogin();
   if (oeSession) oeAttachMainEvents(); else oeAttachLoginEvents();
 }
@@ -201,76 +225,194 @@ async function oeDoLogin(nom, code) {
   }
 }
 
-// ===================== ÉCRAN PRINCIPAL (créneaux + mes RDV) =====================
+// ===================== ÉCRAN PRINCIPAL (4 onglets) =====================
+// oeRenderMain() affiche l'en-tête + l'onglet courant (oeCurrentView) + la nav du bas. Chaque
+// onglet a son propre oeRenderXxxTab(), attaché depuis oeAttachMainEvents() (un seul point
+// d'entrée, comme attachEvents() dans l'appli principale, mais sans le découpage par module —
+// cette page reste volontairement plus légère).
 
 function oeRenderMain() {
   let html = `<div class="oe-title">Réservation ostéo</div><div class="oe-sub">Bonjour ${oeEscapeHtml(oeSession.nom)}.</div>`;
 
-  if (oeLoadError) {
+  if (oeCurrentView === "consignes") {
+    html += oeRenderConsignesTab();
+  } else if (oeLoadError) {
     html += `<div class="oe-card"><div class="oe-muted">${oeEscapeHtml(oeLoadError)}</div></div>`;
   } else if (!oeData) {
     html += `<div class="oe-card"><div class="oe-muted">Chargement...</div></div>`;
+  } else if (oeCurrentView === "profil") {
+    html += oeRenderProfilTab();
+  } else if (oeCurrentView === "support") {
+    html += oeRenderSupportTab();
   } else {
-    const reservedIds = new Set(oeData.mesReservations.map(r => r.slotId));
-    const available = oeData.slots.filter(s => s.disponible || reservedIds.has(s.id));
+    html += oeRenderOsteoTab();
+  }
 
-    html += `<div class="oe-section-h">Créneaux disponibles</div>`;
-    const freeSlots = available.filter(s => s.disponible);
-    if (freeSlots.length === 0) {
-      html += `<div class="oe-card"><div class="oe-muted">Aucun créneau disponible pour le moment.</div></div>`;
-    } else {
-      freeSlots.forEach(s => {
+  html += oeRenderBottomNav();
+  return html;
+}
+
+// ----- Onglet Ostéo (créneaux disponibles + mes RDV) -----
+function oeRenderOsteoTab() {
+  let html = "";
+  const reservedIds = new Set(oeData.mesReservations.map(r => r.slotId));
+  const available = oeData.slots.filter(s => s.disponible || reservedIds.has(s.id));
+
+  html += `<div class="oe-section-h">Créneaux disponibles</div>`;
+  const freeSlots = available.filter(s => s.disponible);
+  if (freeSlots.length === 0) {
+    html += `<div class="oe-card"><div class="oe-muted">Aucun créneau disponible pour le moment.</div></div>`;
+  } else {
+    freeSlots.forEach(s => {
+      html += `<div class="oe-card">
+        <div class="oe-slot-top">
+          <div>
+            <div class="oe-slot-date">${oeEscapeHtml(oeDateLabel(s.date, s.heure))}</div>
+            <div class="oe-slot-meta">${oeEscapeHtml(s.heure || "")}${s.lieu ? " · " + oeEscapeHtml(s.lieu) : ""}</div>
+          </div>
+          <div class="oe-tag">${oeEscapeHtml(s.equipe)}</div>
+        </div>
+        ${oeReservingSlotId === s.id ? `
+          <div class="oe-motif-box">
+            <label class="oe-field-label">Motif (optionnel)</label>
+            <textarea id="oe-motif-${oeEscapeHtml(s.id)}" rows="3" placeholder="Ex: douleur à l'épaule droite..."></textarea>
+            <div class="oe-motif-actions">
+              <button class="oe-btn secondary" data-oe-motif-cancel="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Annuler</button>
+              <button class="oe-btn" data-oe-motif-confirm="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Confirmer</button>
+            </div>
+          </div>
+        ` : `
+          <div class="oe-slot-action"><button class="oe-btn" data-oe-reserve="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Réserver</button></div>
+        `}
+      </div>`;
+    });
+  }
+
+  html += `<div class="oe-section-h">Mes rendez-vous</div>`;
+  if (oeData.mesReservations.length === 0) {
+    html += `<div class="oe-card"><div class="oe-muted">Aucun rendez-vous réservé.</div></div>`;
+  } else {
+    oeData.mesReservations
+      .slice()
+      .sort((a, b) => (a.date + "T" + a.heure).localeCompare(b.date + "T" + b.heure))
+      .forEach(r => {
         html += `<div class="oe-card">
           <div class="oe-slot-top">
             <div>
-              <div class="oe-slot-date">${oeEscapeHtml(oeDateLabel(s.date, s.heure))}</div>
-              <div class="oe-slot-meta">${oeEscapeHtml(s.heure || "")}${s.lieu ? " · " + oeEscapeHtml(s.lieu) : ""}</div>
+              <div class="oe-slot-date">${oeEscapeHtml(oeDateLabel(r.date, r.heure))}</div>
+              <div class="oe-slot-meta">${oeEscapeHtml(r.heure || "")}${r.lieu ? " · " + oeEscapeHtml(r.lieu) : ""}</div>
             </div>
-            <div class="oe-tag">${oeEscapeHtml(s.equipe)}</div>
           </div>
-          ${oeReservingSlotId === s.id ? `
-            <div class="oe-motif-box">
-              <label class="oe-field-label">Motif (optionnel)</label>
-              <textarea id="oe-motif-${oeEscapeHtml(s.id)}" rows="3" placeholder="Ex: douleur à l'épaule droite..."></textarea>
-              <div class="oe-motif-actions">
-                <button class="oe-btn secondary" data-oe-motif-cancel="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Annuler</button>
-                <button class="oe-btn" data-oe-motif-confirm="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Confirmer</button>
-              </div>
-            </div>
-          ` : `
-            <div class="oe-slot-action"><button class="oe-btn" data-oe-reserve="${oeEscapeHtml(s.id)}" ${oeBusy ? "disabled" : ""}>Réserver</button></div>
-          `}
+          ${r.motif ? `<div class="oe-slot-motif">Motif : ${oeEscapeHtml(r.motif)}</div>` : ""}
+          <div class="oe-slot-action"><button class="oe-btn danger" data-oe-cancel="${oeEscapeHtml(r.slotId)}" ${oeBusy ? "disabled" : ""}>Annuler</button></div>
         </div>`;
       });
-    }
-
-    html += `<div class="oe-section-h">Mes rendez-vous</div>`;
-    if (oeData.mesReservations.length === 0) {
-      html += `<div class="oe-card"><div class="oe-muted">Aucun rendez-vous réservé.</div></div>`;
-    } else {
-      oeData.mesReservations
-        .slice()
-        .sort((a, b) => (a.date + "T" + a.heure).localeCompare(b.date + "T" + b.heure))
-        .forEach(r => {
-          html += `<div class="oe-card">
-            <div class="oe-slot-top">
-              <div>
-                <div class="oe-slot-date">${oeEscapeHtml(oeDateLabel(r.date, r.heure))}</div>
-                <div class="oe-slot-meta">${oeEscapeHtml(r.heure || "")}${r.lieu ? " · " + oeEscapeHtml(r.lieu) : ""}</div>
-              </div>
-            </div>
-            ${r.motif ? `<div class="oe-slot-motif">Motif : ${oeEscapeHtml(r.motif)}</div>` : ""}
-            <div class="oe-slot-action"><button class="oe-btn danger" data-oe-cancel="${oeEscapeHtml(r.slotId)}" ${oeBusy ? "disabled" : ""}>Annuler</button></div>
-          </div>`;
-        });
-    }
   }
+
+  return html;
+}
+
+// ----- Onglet Profil (nom, email, RDV passés, déconnexion) -----
+function oeRenderProfilTab() {
+  const moi = oeData.moi || { nom: oeSession.nom, email: "", rdvPasses: 0 };
+  let html = `<div class="oe-section-h">Mon profil</div>`;
+
+  html += `<div class="oe-card">
+    <label class="oe-field-label" style="margin-top:0;">Nom</label>
+    <div style="font-size:15px; font-weight:700; color:#fff;">${oeEscapeHtml(moi.nom)}</div>
+  </div>`;
+
+  html += `<div class="oe-card">
+    <label class="oe-field-label" style="margin-top:0;">Adresse mail</label>`;
+  if (!moi.email || oeProfilEmailEditing) {
+    html += `
+      <input id="oe-profil-email" type="email" placeholder="ton.email@exemple.com" value="${oeEscapeHtml(moi.email || "")}" />
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="oe-btn" style="flex:1;" id="oe-profil-email-save">Enregistrer</button>
+        ${oeProfilEmailEditing ? `<button class="oe-btn secondary" style="flex:1;" id="oe-profil-email-cancel">Annuler</button>` : ""}
+      </div>`;
+  } else {
+    html += `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="flex:1; font-size:13px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${oeEscapeHtml(moi.email)}</div>
+        <button class="oe-btn secondary" style="width:auto; padding:8px 12px;" id="oe-profil-email-edit">Modifier</button>
+      </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="oe-card" style="text-align:center;">
+    <div style="font-size:26px; font-weight:800; color:#fff;">${moi.rdvPasses}</div>
+    <div class="oe-muted">rendez-vous passé${moi.rdvPasses > 1 ? "s" : ""}</div>
+  </div>`;
 
   html += `<div class="oe-logout" id="oe-logout">Se déconnecter</div>`;
   return html;
 }
 
+// ----- Onglet Support (contact direct + historique) -----
+function oeRenderSupportTab() {
+  let html = `<div class="oe-section-h">Une question pour Eve ?</div>
+  <div class="oe-card">
+    <label class="oe-field-label" style="margin-top:0;">Ton message</label>
+    <textarea id="oe-support-message" rows="5" placeholder="Décris ta question..."></textarea>
+    <button class="oe-btn" id="oe-support-submit" style="margin-top:10px;" ${oeSupportSending ? "disabled" : ""}>${oeSupportSending ? "Envoi en cours..." : "Envoyer"}</button>
+    ${oeSupportSent ? `<div class="oe-muted" style="margin-top:8px; color:#33d17a; font-weight:700;">Message envoyé, merci !</div>` : ""}
+  </div>`;
+
+  html += `<div class="oe-section-h">Historique</div>`;
+  if (oeSupportHistoryState.loading && !oeSupportHistoryState.loaded) {
+    html += `<div class="oe-card"><div class="oe-muted">Chargement…</div></div>`;
+  } else if (oeSupportHistoryState.history.length === 0) {
+    html += `<div class="oe-card"><div class="oe-muted">Aucune demande envoyée pour le moment.</div></div>`;
+  } else {
+    oeSupportHistoryState.history.forEach(h => {
+      html += `<div class="oe-card">
+        <div class="oe-muted" style="font-size:10.5px; margin-bottom:6px;">${oeEscapeHtml(h.date)}</div>
+        <div style="font-size:12.5px; color:#e8e8ee; line-height:1.5;">${oeEscapeHtml(h.message)}</div>
+        ${h.reponse ? `
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:9.5px; font-weight:800; text-transform:uppercase; color:#33d17a; margin-bottom:4px;">Réponse d'Eve</div>
+            <div style="font-size:12px; color:#e4e8f2; line-height:1.5;">${oeEscapeHtml(h.reponse)}</div>
+          </div>
+        ` : `<div class="oe-muted" style="margin-top:6px; font-size:10.5px; font-style:italic;">En attente de réponse</div>`}
+      </div>`;
+    });
+  }
+  return html;
+}
+
+// ----- Onglet Consignes (statique, pas d'appel réseau) -----
+function oeRenderConsignesTab() {
+  return `<div class="oe-section-h">Comment ça marche</div>
+  <div class="oe-card">
+    <div style="font-size:13px; color:#e8e8ee; line-height:1.7;">
+      <p style="margin:0 0 10px;">Bienvenue sur ton espace de réservation avec Eve, ostéopathe. Voici l'essentiel :</p>
+      <p style="margin:0 0 8px;">🗓️ <b>Voir les créneaux</b> — l'onglet « Ostéo » liste tous les rendez-vous encore libres, avec le jour, l'heure et le lieu.</p>
+      <p style="margin:0 0 8px;">✅ <b>Réserver</b> — touche « Réserver » sur le créneau qui te convient. Tu peux ajouter un mot sur le motif de ta visite si tu le souhaites, ce n'est jamais obligatoire.</p>
+      <p style="margin:0 0 8px;">❌ <b>Annuler</b> — dans « Mes rendez-vous », un bouton « Annuler » libère aussitôt le créneau pour quelqu'un d'autre.</p>
+      <p style="margin:0;">🔒 <b>Confidentialité</b> — le motif que tu indiques, et toute note qu'Eve prend après ta visite, ne sont jamais visibles par personne d'autre qu'elle.</p>
+    </div>
+  </div>`;
+}
+
+// ----- Nav du bas -----
+function oeRenderBottomNav() {
+  return `<div class="oe-bottom-nav">
+    ${OE_TABS.map(t => `<button type="button" class="oe-nav-btn ${oeCurrentView === t.id ? "active" : ""}" data-oe-view="${t.id}">
+      <span class="oe-nav-icon">${t.icon}</span>${t.label}
+    </button>`).join("")}
+  </div>`;
+}
+
 function oeAttachMainEvents() {
+  document.querySelectorAll("[data-oe-view]").forEach(el => {
+    el.onclick = () => {
+      oeCurrentView = el.dataset.oeView;
+      if (oeCurrentView === "support" && !oeSupportHistoryState.loaded && !oeSupportHistoryState.loading) oeFetchSupportHistory();
+      oeRender();
+    };
+  });
+
   document.querySelectorAll("[data-oe-reserve]").forEach(el => {
     el.onclick = () => { oeReservingSlotId = el.dataset.oeReserve; oeRender(); };
   });
@@ -291,11 +433,35 @@ function oeAttachMainEvents() {
       oeCancelReservation(el.dataset.oeCancel);
     };
   });
+
+  const profilEmailSave = document.getElementById("oe-profil-email-save");
+  if (profilEmailSave) profilEmailSave.onclick = () => {
+    const val = (document.getElementById("oe-profil-email").value || "").trim();
+    if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { alert("Merci de renseigner une adresse mail valide."); return; }
+    oeSaveEmail(val);
+  };
+  const profilEmailEdit = document.getElementById("oe-profil-email-edit");
+  if (profilEmailEdit) profilEmailEdit.onclick = () => { oeProfilEmailEditing = true; oeRender(); };
+  const profilEmailCancel = document.getElementById("oe-profil-email-cancel");
+  if (profilEmailCancel) profilEmailCancel.onclick = () => { oeProfilEmailEditing = false; oeRender(); };
+
+  const supportSubmit = document.getElementById("oe-support-submit");
+  if (supportSubmit) supportSubmit.onclick = () => {
+    const msg = (document.getElementById("oe-support-message").value || "").trim();
+    if (!msg) { alert("Merci d'écrire un message avant d'envoyer."); return; }
+    oeSendSupportMessage(msg);
+  };
+
   const logoutEl = document.getElementById("oe-logout");
   if (logoutEl) logoutEl.onclick = () => {
     localStorage.removeItem(OE_SESSION_KEY);
     oeSession = null;
     oeData = null;
+    oeCurrentView = "osteo";
+    oeProfilEmailEditing = false;
+    oeSupportHistoryState = { loading: false, loaded: false, history: [] };
+    oeSupportSending = false;
+    oeSupportSent = false;
     oeLoginNom = "";
     oeLoginStep = "nom";
     oeLoginError = "";
@@ -315,10 +481,55 @@ async function oeLoadMainData() {
       oeRender();
       return;
     }
-    oeData = { slots: data.slots || [], mesReservations: data.mesReservations || [] };
+    oeData = { slots: data.slots || [], mesReservations: data.mesReservations || [], moi: data.moi || { nom: oeSession.nom, email: "", rdvPasses: 0 } };
     oeRender();
   } catch (err) {
     oeLoadError = "Connexion impossible pour le moment (hors ligne ?).";
+    oeRender();
+  }
+}
+
+// Enregistre l'adresse mail (action générique "setEmail", Auth.gs — mêmes paramètres que
+// js/modules/profil.js côté appli principale : un externe n'édite jamais que sa propre ligne).
+async function oeSaveEmail(email) {
+  if (oeData && oeData.moi) oeData.moi.email = email; // optimiste
+  oeProfilEmailEditing = false;
+  oeRender();
+  try {
+    const params = new URLSearchParams({ action: "setEmail", nom: oeSession.nom, email, authNom: oeSession.nom, authCode: oeSession.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+  } catch (err) {
+    oeShowToast("Échec de l'enregistrement (hors ligne ?)", "error");
+  }
+}
+
+async function oeFetchSupportHistory() {
+  oeSupportHistoryState.loading = true;
+  oeRender();
+  try {
+    const params = new URLSearchParams({ action: "getMySupportHistory", authNom: oeSession.nom, authCode: oeSession.code });
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    const data = await res.json();
+    if (data.ok) oeSupportHistoryState = { loading: false, loaded: true, history: data.history || [] };
+    else oeSupportHistoryState.loading = false;
+  } catch (err) {
+    oeSupportHistoryState.loading = false;
+  }
+  oeRender();
+}
+
+async function oeSendSupportMessage(message) {
+  oeSupportSending = true;
+  oeRender();
+  try {
+    const params = new URLSearchParams({ action: "sendSupportMessage", message, authNom: oeSession.nom, authCode: oeSession.code });
+    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+    oeSupportSending = false;
+    oeSupportSent = true;
+    oeFetchSupportHistory();
+  } catch (err) {
+    oeSupportSending = false;
+    oeShowToast("Échec de l'envoi (hors ligne ?)", "error");
     oeRender();
   }
 }

@@ -82,6 +82,20 @@ function api_sendSupportMessage(ss, e) {
     Logger.log("Erreur notif push nouvelle demande support : " + err);
   }
 
+  // Un message envoyé par un compte "Externe" (suivi par Eve en dehors du club, voir Osteo.gs)
+  // prévient AUSSI qui a le rôle "Ostéo" — en plus de l'Admin ci-dessus, jamais à sa place : Eve
+  // n'a sinon aucune autre raison de surveiller la page Support (réservée à l'Admin), alors que
+  // ses propres suivis externes peuvent lui écrire depuis osteo-externe.html. Jamais bloquant.
+  if (hasRole(role, "Externe")) {
+    try {
+      const osteoTokens = pushTokensForRole(ss, "Ostéo");
+      const body = `${e.parameter.authNom} (externe) a envoyé une question via Support.`;
+      osteoTokens.forEach(token => sendPushNotification(token, "💬 Nouvelle demande support", body));
+    } catch (err) {
+      Logger.log("Erreur notif push nouvelle demande support (Ostéo) : " + err);
+    }
+  }
+
   return jsonOut({ ok: true });
 }
 

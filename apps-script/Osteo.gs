@@ -397,9 +397,12 @@ function api_deleteOsteoSlot(ss, e) {
 // c'est le même compte "Comptes" et les mêmes feuilles OsteoSlots/OsteoReservations que tout le
 // monde : Eve voit donc les réservations des externes exactement au même endroit que celles des
 // joueurs, dans sa vue manager RDV Ostéo habituelle, sans rien changer à son propre usage de
-// l'appli. Le rôle "Externe" ne donne accès à AUCUNE autre route de l'API que reserveOsteoSlot/
-// cancelOsteoReservation/getOsteoExterneData (génériques, non restreintes par rôle) — toute
-// tentative d'appeler une action réservée à un autre rôle échoue comme pour n'importe qui.
+// l'appli. Le rôle "Externe" n'a accès qu'aux routes génériques, non restreintes par rôle
+// (checkAuth suffit) : reserveOsteoSlot/cancelOsteoReservation/getOsteoExterneData, plus
+// setEmail/sendSupportMessage/getMySupportHistory pour les onglets Profil et Support de
+// osteo-externe.html (voir js/osteo-externe.js) — toute tentative d'appeler une action
+// réservée à un autre rôle (dont setOsteoReservationNote/getExterneClientsHistory, réservées
+// à Ostéo/Admin ci-dessous) échoue comme pour n'importe qui.
 
 // Réservé à Ostéo/Admin (même allowlist que api_addOsteoSlot) : crée le compte d'une personne
 // externe au club, avec le rôle "Externe:Toutes" toujours — un externe n'est jamais rattaché à
@@ -453,6 +456,16 @@ function api_getOsteoExterneData(ss, e) {
   const resaData = resaSheet.getDataRange().getValues();
   const tz = Session.getScriptTimeZone();
 
+  // "moi" alimente l'onglet Profil de la page externe (voir js/osteo-externe.js) : nom + email
+  // tels qu'enregistrés dans Comptes, et le nombre de RDV déjà passés (calculé ici, jamais stocké).
+  const comptesSheet = ss.getSheetByName("Comptes");
+  ensureComptesSchema(comptesSheet);
+  const comptesData = comptesSheet.getDataRange().getValues();
+  let moiEmail = "";
+  for (let i = 1; i < comptesData.length; i++) {
+    if (comptesData[i][COL_NOM] === e.parameter.authNom) { moiEmail = comptesData[i][COL_EMAIL] || ""; break; }
+  }
+
   const reservedSlotIds = new Set();
   for (let i = 1; i < resaData.length; i++) reservedSlotIds.add(resaData[i][0]);
 
@@ -476,21 +489,26 @@ function api_getOsteoExterneData(ss, e) {
   }
 
   const mesReservations = [];
+  let rdvPasses = 0;
   for (let i = 1; i < resaData.length; i++) {
     if (resaData[i][1] !== e.parameter.authNom) continue; // jamais les réservations des autres
     const slotId = resaData[i][0];
     const slotRow = slotsData.find(r => r[0] === slotId);
     if (!slotRow) continue;
+    const slotDateStr = slotRow[1] instanceof Date ? Utilities.formatDate(slotRow[1], tz, "yyyy-MM-dd") : String(slotRow[1] || "");
+    if (slotDateStr < todayStr) rdvPasses++;
     mesReservations.push({
       slotId: slotId,
       motif: resaData[i][2] || "",
-      date: slotRow[1] instanceof Date ? Utilities.formatDate(slotRow[1], tz, "yyyy-MM-dd") : String(slotRow[1] || ""),
+      date: slotDateStr,
       heure: slotRow[2] instanceof Date ? Utilities.formatDate(slotRow[2], tz, "HH:mm") : String(slotRow[2] || ""),
       lieu: slotRow[3] || "",
     });
   }
 
-  return jsonOut({ ok: true, slots: slots, mesReservations: mesReservations });
+  const moi = { nom: e.parameter.authNom, email: moiEmail, rdvPasses: rdvPasses };
+
+  return jsonOut({ ok: true, slots: slots, mesReservations: mesReservations, moi: moi });
 }
 
 // Réservé à Ostéo/Admin : enregistre la note privée d'Eve sur une réservation précise (colonne
