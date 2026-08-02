@@ -27,17 +27,19 @@ body {
   padding-bottom: calc(92px + env(safe-area-inset-bottom));
   min-height: 100vh;
 }
-/* Le fond (photo) reste le même qu'avant, mais flouté pour un rendu plus soigné — le flou vit
-   dans ::before (pas directement sur #app) pour ne pas flouter le contenu par-dessus. Légèrement
-   plus grand que #app (-14px de chaque côté) pour que l'adoucissement du flou ne révèle pas un
-   bord net sur les côtés. */
 #app {
   position: relative;
   z-index: 1;
   max-width: 100%;
   padding: 12px;
 }
-#app::before {
+/* Le fond (photo) reste le même qu'avant, mais flouté pour un rendu plus soigné — le flou vit
+   dans ::before (pas directement sur le contenu) pour ne pas flouter le contenu par-dessus. Posé
+   sur body plutôt que sur #app : #app est recadré à 820px de large sur desktop (voir le media
+   query plus bas), donc un fond posé dessus s'arrêterait net à cette largeur et laisserait un bord
+   visible entre la carte centrée et le reste de l'écran. Sur body, il couvre toujours toute la
+   largeur de la fenêtre, quelle que soit la largeur de #app. */
+body::before {
   content: "";
   position: absolute;
   /* Le flou (9px) déborde visuellement d'environ 3x son rayon (~27px) : avec seulement -14px de
