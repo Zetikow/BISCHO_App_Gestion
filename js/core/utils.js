@@ -144,18 +144,6 @@ document.addEventListener("touchstart", (e) => {
   }, { passive: true });
 });
 
-// Un doigt posé sur l'écran = un geste de scroll potentiellement en cours — voir fetchAll()
-// (core/api.js), qui évite de reconstruire toute la page (render()) tant que window.__touchActive
-// est vrai, sinon un sondage qui tombe pile pendant un balayage remplace le DOM en plein geste et
-// coupe l'inertie du scroll (ressenti comme "l'écran ne défile plus"). Plus fréquent sur les pages
-// avec beaucoup de contenu (Accueil, Agenda) et les clubs très actifs où les données changent
-// souvent d'un sondage à l'autre.
-window.__touchActive = false;
-document.addEventListener("touchstart", () => { window.__touchActive = true; }, { passive: true });
-["touchend", "touchcancel"].forEach(evt => {
-  document.addEventListener(evt, () => { window.__touchActive = false; }, { passive: true });
-});
-
 // Capture la position/taille de la carte tapée juste avant qu'un clic n'ouvre une fiche (bottom
 // sheet), pour que playSheetOpenAnimation() (core/render.js) puisse la faire "grandir" depuis
 // cet endroit plutôt que glisser depuis le bas de l'écran. Capture phase : s'exécute avant les
