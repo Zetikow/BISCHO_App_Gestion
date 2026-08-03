@@ -60,8 +60,6 @@ function api_getAll(ss, e) {
   const tableMarque = tableMarqueSheet ? tableMarqueSheet.getDataRange().getValues() : [];
   const maillotsSheet = ss.getSheetByName("Maillots");
   const maillots = maillotsSheet ? maillotsSheet.getDataRange().getValues() : [];
-  const foodtrucksSheet = ss.getSheetByName("Foodtrucks");
-  const foodtrucks = (foodtrucksSheet && canManageFoodtrucks(callerRole)) ? foodtrucksSheet.getDataRange().getValues() : [];
   const repasMenuSheet = ss.getSheetByName("RepasMenu");
   const repasMenu = repasMenuSheet ? repasMenuSheet.getDataRange().getValues() : [];
   const repasPrevuSheet = ss.getSheetByName("RepasPrevu");
@@ -71,5 +69,5 @@ function api_getAll(ss, e) {
   const repasFinancesSheet = ss.getSheetByName("RepasFinances");
   const repasFinances = (repasFinancesSheet && canManageRepas(callerRole)) ? repasFinancesSheet.getDataRange().getValues() : [];
 
-  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, selectionsMeta, benevoles, gouter, gouterOptions, tableMarque, maillots, foodtrucks, repasMenu, repasPrevu, repasTarifs, repasFinances });
+  return jsonOut({ ok: true, grid, comptes, presences, paiements, evenements, presenceEvenements, actualites, covoiturage, osteoSlots, osteoReservations, compositions, compositionsMeta, selections, selectionsMeta, benevoles, gouter, gouterOptions, tableMarque, maillots, repasMenu, repasPrevu, repasTarifs, repasFinances });
 }

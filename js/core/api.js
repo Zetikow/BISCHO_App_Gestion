@@ -34,7 +34,6 @@ async function fetchAll() {
     gouterOptions = (data.gouterOptions || []).slice(1).filter(r => r[0]);
     tableMarque = (data.tableMarque || []).slice(1).filter(r => r[0]);
     maillots = (data.maillots || []).slice(1).filter(r => r[0]);
-    foodtrucks = (data.foodtrucks || []).slice(1).filter(r => r[0]);
     repasMenu = (data.repasMenu || []).slice(1).filter(r => r[0]);
     repasPrevu = (data.repasPrevu || []).slice(1).filter(r => r[0]);
     repasTarifs = (data.repasTarifs || []).slice(1).filter(r => r[0]);

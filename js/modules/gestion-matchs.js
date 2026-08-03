@@ -18,15 +18,7 @@ const GESTION_MATCHS_SECTIONS = [
   { id: "repas", label: "Repas" },
 ];
 
-// Suivi financier des foodtrucks : réservé Admin/Coach/Salarié, pas un onglet joueur/parent.
-// Fonction gardée telle quelle (même si l'onglet Foodtrucks n'est plus affiché) : le code de
-// suivi des foodtrucks reste dans le fichier, juste retiré de GESTION_MATCHS_SECTIONS, au cas
-// où le club voudrait le remettre plus tard.
-function canManageFoodtrucks() {
-  return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
-}
-
-// Suivi du repas d'après-match : mêmes rôles que les foodtrucks qu'il remplace.
+// Suivi du repas d'après-match : réservé Admin/Coach/Salarié, pas un onglet joueur/parent.
 function canManageRepas() {
   return hasRole("Admin") || hasRole("Coach") || hasRole("Salarié");
 }
@@ -409,117 +401,6 @@ function renderMaillotsSection(activeTeam) {
   return html;
 }
 
-// Historique + à venir, tous les matchs à domicile du club (les plus récents en premier) — pas
-// scoping par équipe, contrairement aux autres sections : un foodtruck ne concerne aucune
-// équipe en particulier, il vient pour une date/un match donné quelle que soit l'équipe qui joue.
-function foodtruckHomeMatches() {
-  const teams = myCarpoolTeams();
-  return evenements.filter(ev => typeClass(ev[3]) === "match" && teams.includes(eventEquipe(ev)) && isHomeMatch(ev[5]))
-    .sort((a, b) => eventDateObj(b) - eventDateObj(a));
-}
-
-function foodtruckEntriesFor() {
-  const ids = new Set(foodtruckHomeMatches().map(ev => ev[0]));
-  return foodtrucks.filter(r => ids.has(r[1]));
-}
-
-function renderFoodtruckSection() {
-  const matches = foodtruckHomeMatches();
-  const entries = foodtruckEntriesFor();
-  const total = entries.reduce((s, r) => s + (parseFloat(r[4]) || 0), 0);
-
-  let html = `<div class="pay-summary">
-    <div class="pay-summary-label">Bénéfice total foodtrucks</div>
-    <div class="pay-summary-val">${fmt(total)} €</div>
-  </div>`;
-
-  html += `<button class="btn add-btn-primary" id="toggle-add-foodtruck">+ Ajouter un passage foodtruck</button>`;
-
-  html += `<div class="section-h">Historique</div>`;
-  if (entries.length === 0) {
-    html += `<div class="card muted">Aucun passage foodtruck enregistré pour le moment.</div>`;
-  } else {
-    html += `<div class="card">`;
-    entries.slice().reverse().forEach(r => {
-      const [id, eventId, nom, prix, benefice, notes] = r;
-      const ev = evenements.find(e => e[0] === eventId);
-      const evLabel = ev ? `${eventDateObj(ev).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} · ${eventEquipe(ev)} · ${formatMatchDisplay(ev[4], ev[5]).label || ev[4] || "Match"}` : "Match supprimé";
-      if (window.__editingFoodtruckId === id) {
-        html += `<div class="paiement-row" style="display:block; padding:10px 0;">
-          <label class="field-label">Nom du foodtruck</label>
-          <input id="edit-foodtruck-nom-${id}" type="text" value="${escapeHtml(nom || "")}" style="margin-bottom:6px;" />
-          <label class="field-label">Match associé</label>
-          <select id="edit-foodtruck-event-${id}" style="margin-bottom:6px;">
-            ${matches.map(m => `<option value="${escapeHtml(m[0])}" ${m[0] === eventId ? "selected" : ""}>${eventDateObj(m).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} — ${escapeHtml(eventEquipe(m))} — ${escapeHtml(formatMatchDisplay(m[4], m[5]).label || m[4] || "Match")}</option>`).join("")}
-          </select>
-          <label class="field-label">Prix / menu</label>
-          <input id="edit-foodtruck-prix-${id}" type="text" value="${escapeHtml(prix || "")}" style="margin-bottom:6px;" />
-          <label class="field-label">Bénéfice (€)</label>
-          <input id="edit-foodtruck-benefice-${id}" type="number" step="0.5" value="${benefice || ""}" style="margin-bottom:6px;" />
-          <label class="field-label">Notes</label>
-          <input id="edit-foodtruck-notes-${id}" type="text" value="${escapeHtml(notes || "")}" style="margin-bottom:8px;" />
-          <div class="row-flex">
-            <button class="btn" style="flex:1;" data-save-foodtruck="${id}">Enregistrer</button>
-            <button class="btn secondary" style="flex:1;" data-cancel-edit-foodtruck="1">Annuler</button>
-          </div>
-        </div>`;
-      } else {
-        html += `<div class="paiement-row" style="align-items:flex-start;">
-          <div>
-            <div style="font-weight:700; color:#e8e8ee;">${escapeHtml(nom || "Foodtruck")}</div>
-            <div class="muted" style="font-size:11px; margin-top:2px;">${escapeHtml(evLabel)}${prix ? " · " + escapeHtml(prix) : ""}</div>
-            ${notes ? `<div class="muted" style="font-size:11px; margin-top:2px;">${escapeHtml(notes)}</div>` : ""}
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:#78c850; font-weight:800;">${fmt(parseFloat(benefice) || 0)} €</span>
-            ${iconBtn(ICON_EDIT, "ev-edit", `data-edit-foodtruck="${id}"`)}
-            ${iconBtn(ICON_CROSS, "ev-del", `data-delete-foodtruck="${id}"`)}
-          </div>
-        </div>`;
-      }
-    });
-    html += `</div>`;
-  }
-
-  html += renderAddFoodtruckSheet(matches);
-
-  return html;
-}
-
-// ===================== FICHE AJOUT FOODTRUCK (bottom sheet) =====================
-function renderAddFoodtruckSheet(matches) {
-  if (!window.__showAddFoodtruck) return "";
-  const bodyHtml = matches.length === 0
-    ? `<div class="muted">Aucun match à domicile enregistré pour l'instant.</div>`
-    : `
-      <label class="field-label">Nom du foodtruck</label>
-      <input id="foodtruck-nom" type="text" placeholder="Ex: Chez Mario — Pizza" />
-      <label class="field-label">Match associé</label>
-      <select id="foodtruck-event">
-        ${matches.map(ev => `<option value="${escapeHtml(ev[0])}">${eventDateObj(ev).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} — ${escapeHtml(eventEquipe(ev))} — ${escapeHtml(formatMatchDisplay(ev[4], ev[5]).label || ev[4] || "Match")}</option>`).join("")}
-      </select>
-      <label class="field-label">Prix / menu</label>
-      <input id="foodtruck-prix" type="text" placeholder="Ex: 8€ la part" />
-      <label class="field-label">Bénéfice pour le club (€)</label>
-      <input id="foodtruck-benefice" type="number" step="0.5" placeholder="Ex: 85" />
-      <label class="field-label">Notes (optionnel)</label>
-      <input id="foodtruck-notes" type="text" placeholder="Ex: bien venu, prévoir 2 emplacements..." />
-      <button class="btn" id="foodtruck-add" style="margin-top:12px;">Enregistrer</button>`;
-
-  return `<div class="sheet-overlay open" data-close-sheet="showAddFoodtruck">
-    <div class="sheet-scrim" data-close-sheet="showAddFoodtruck"></div>
-    <div class="sheet">
-      <div class="sheet-close" data-close-sheet="showAddFoodtruck">✕</div>
-      <div class="sheet-grab"></div>
-      <div class="sheet-hero">
-        <div class="sheet-hero-eyebrow">Gestion des matchs</div>
-        <h2>Ajouter un passage foodtruck</h2>
-      </div>
-      <div class="sheet-body">${bodyHtml}</div>
-    </div>
-  </div>`;
-}
-
 function renderGestionMatchsPage() {
   const teams = myCarpoolTeams();
   if (teams.length === 0) {
@@ -546,48 +427,6 @@ function renderGestionMatchsPage() {
   if (window.__repasDetailFor) html += renderRepasDetailSheet();
 
   return html;
-}
-
-// ===================== ACTIONS API : FOODTRUCKS =====================
-
-async function addFoodtruckApi(eventId, nom, prix, benefice, notes) {
-  const tempId = "temp_" + Date.now();
-  foodtrucks.push([tempId, eventId, nom, prix, benefice, notes || ""]);
-  render();
-  try {
-    const params = new URLSearchParams({ action: "addFoodtruck", eventId, nom, prix, benefice, notes: notes || "", authNom: session.nom, authCode: session.code });
-    const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
-    const data = await res.json();
-    if (data.ok) {
-      await fetchAll();
-    } else {
-      foodtrucks = foodtrucks.filter(r => r[0] !== tempId);
-      showToast("Échec de l'ajout", "error");
-      render();
-    }
-  } catch (err) {
-    isOnline = false;
-    foodtrucks = foodtrucks.filter(r => r[0] !== tempId);
-    showToast("Échec de l'ajout", "error");
-    render();
-  }
-}
-
-async function updateFoodtruckApi(id, eventId, nom, prix, benefice, notes) {
-  try {
-    const params = new URLSearchParams({ action: "updateFoodtruck", id, eventId, nom, prix, benefice, notes: notes || "", authNom: session.nom, authCode: session.code });
-    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
-    window.__editingFoodtruckId = null;
-    await fetchAll();
-  } catch (err) { isOnline = false; render(); }
-}
-
-async function deleteFoodtruckApi(id) {
-  try {
-    const params = new URLSearchParams({ action: "deleteFoodtruck", id, authNom: session.nom, authCode: session.code });
-    await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
-    await fetchAll();
-  } catch (err) { isOnline = false; render(); }
 }
 
 // ===================== REPAS D'APRÈS-MATCH =====================
@@ -1052,53 +891,6 @@ function attachGestionMatchsEvents() {
       const entry = maillotsEntryFor(eventId, nom);
       const newVal = (entry && entry[2] === "Oui") ? "" : "Oui";
       setMaillotsApi(nom, eventId, newVal);
-    };
-  });
-
-  const toggleAddFoodtruck = document.getElementById("toggle-add-foodtruck");
-  if (toggleAddFoodtruck) toggleAddFoodtruck.onclick = () => {
-    vibrate();
-    window.__showAddFoodtruck = !window.__showAddFoodtruck;
-    render();
-  };
-
-  const foodtruckAdd = document.getElementById("foodtruck-add");
-  if (foodtruckAdd) foodtruckAdd.onclick = () => {
-    const eventId = document.getElementById("foodtruck-event").value;
-    const nom = document.getElementById("foodtruck-nom").value.trim();
-    const prix = document.getElementById("foodtruck-prix").value.trim();
-    const benefice = parseFloat(document.getElementById("foodtruck-benefice").value) || 0;
-    const notes = document.getElementById("foodtruck-notes").value.trim();
-    if (!nom || !eventId) return;
-    window.__showAddFoodtruck = false;
-    addFoodtruckApi(eventId, nom, prix, benefice, notes);
-  };
-
-  document.querySelectorAll("[data-edit-foodtruck]").forEach(el => {
-    el.onclick = () => { window.__editingFoodtruckId = el.dataset.editFoodtruck; render(); };
-  });
-
-  document.querySelectorAll("[data-cancel-edit-foodtruck]").forEach(el => {
-    el.onclick = () => { window.__editingFoodtruckId = null; render(); };
-  });
-
-  document.querySelectorAll("[data-save-foodtruck]").forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.saveFoodtruck;
-      const eventId = document.getElementById(`edit-foodtruck-event-${id}`).value;
-      const nom = document.getElementById(`edit-foodtruck-nom-${id}`).value.trim();
-      const prix = document.getElementById(`edit-foodtruck-prix-${id}`).value.trim();
-      const benefice = parseFloat(document.getElementById(`edit-foodtruck-benefice-${id}`).value) || 0;
-      const notes = document.getElementById(`edit-foodtruck-notes-${id}`).value.trim();
-      if (!nom || !eventId) return;
-      updateFoodtruckApi(id, eventId, nom, prix, benefice, notes);
-    };
-  });
-
-  document.querySelectorAll("[data-delete-foodtruck]").forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.deleteFoodtruck;
-      if (confirm("Supprimer ce passage foodtruck ?")) deleteFoodtruckApi(id);
     };
   });
 

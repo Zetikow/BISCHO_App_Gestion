@@ -59,9 +59,6 @@ const API_HANDLERS = {
   removeGouterOption: api_removeGouterOption,               // Gouter.gs
   setTableMarque: api_setTableMarque,                       // TableMarque.gs
   setMaillots: api_setMaillots,                             // Maillots.gs
-  addFoodtruck: api_addFoodtruck,                           // Foodtrucks.gs
-  updateFoodtruck: api_updateFoodtruck,                     // Foodtrucks.gs
-  deleteFoodtruck: api_deleteFoodtruck,                     // Foodtrucks.gs
   addRepasMenuItem: api_addRepasMenuItem,                   // Repas.gs
   deleteRepasMenuItem: api_deleteRepasMenuItem,             // Repas.gs
   addRepasTarif: api_addRepasTarif,                         // Repas.gs
