@@ -144,6 +144,20 @@ document.addEventListener("touchstart", (e) => {
   }, { passive: true });
 });
 
+// Horodatage (pas un booléen à bascule) du dernier événement tactile — voir isTouchRecentlyActive()
+// utilisé par fetchAll() (core/api.js) pour ne pas reconstruire toute la page pile pendant un
+// balayage (sinon ça coupe l'inertie du scroll, ressenti comme un "ressort"/blocage). Volontairement
+// un horodatage plutôt qu'un flag on/off : s'expire tout seul après quelques centaines de ms sans
+// contact, donc ne peut jamais rester bloqué à "actif" si un touchend venait à ne pas se déclencher
+// (contrairement à une première tentative avec un booléen, qui pouvait rester coincée).
+let __lastTouchTimestamp = 0;
+["touchstart", "touchmove"].forEach(evt => {
+  document.addEventListener(evt, () => { __lastTouchTimestamp = Date.now(); }, { passive: true });
+});
+function isTouchRecentlyActive() {
+  return (Date.now() - __lastTouchTimestamp) < 400;
+}
+
 // Capture la position/taille de la carte tapée juste avant qu'un clic n'ouvre une fiche (bottom
 // sheet), pour que playSheetOpenAnimation() (core/render.js) puisse la faire "grandir" depuis
 // cet endroit plutôt que glisser depuis le bas de l'écran. Capture phase : s'exécute avant les
