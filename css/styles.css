@@ -19,7 +19,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 @keyframes cardCascadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes navIconBounce { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
-html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; }
+html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; overscroll-behavior-y: contain; }
 body {
   position: relative;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
