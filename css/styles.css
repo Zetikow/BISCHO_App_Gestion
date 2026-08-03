@@ -19,7 +19,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 @keyframes cardCascadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes navIconBounce { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
-html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; }
+html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; overscroll-behavior-y: contain; }
 body {
   position: relative;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -82,7 +82,7 @@ body::before {
 .avatar-menu-item.danger { color: #ff5a5a; }
 
 .bottom-nav { position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 10px; right: 10px; background: #11141f; border: 1px solid #1c2333; border-radius: 22px; display: flex; padding: 10px 6px; z-index: 50; box-shadow: 0 8px 30px rgba(0,0,0,0.45); }
-.nav-pill { position: absolute; top: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); left: 0; width: 0; background: rgba(var(--accent-rgb),0.16); border: 1px solid rgba(var(--accent-rgb),0.4); border-radius: 16px; pointer-events: none; }
+.nav-pill { position: absolute; top: 8px; bottom: 8px; left: 0; width: 0; background: rgba(var(--accent-rgb),0.16); border: 1px solid rgba(var(--accent-rgb),0.4); border-radius: 16px; pointer-events: none; }
 .bottom-nav button, .bottom-nav .bn-select-wrap { flex: 1; min-width: 0; position: relative; z-index: 1; }
 .bottom-nav button { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: #e4e8f2; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; padding: 6px 2px; cursor: pointer; transition: transform 0.12s, color 0.15s; }
 .bottom-nav button:active, .bottom-nav button.tap-active { transform: scale(0.9); }
