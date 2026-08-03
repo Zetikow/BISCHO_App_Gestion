@@ -1,7 +1,7 @@
 // IMPORTANT : incrémente ce numéro à chaque mise à jour déployée de l'appli.
 // Ça force le renouvellement du cache ET (via APP_VERSION dans index.html)
 // la déconnexion de tous les utilisateurs pour qu'ils rechargent la dernière version.
-const CACHE_NAME = "caisse-noire-v2026-08-03-7";
+const CACHE_NAME = "caisse-noire-v2026-08-03-8";
 const ASSETS = [
   "./manifest.json",
   "./images/icon-192.png",
@@ -75,10 +75,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // index.html (et la racine du site) : toujours vérifier le réseau en premier,
-  // pour ne jamais servir une version périmée du code de l'appli.
+  // index.html, CSS et JS (le "code" de l'appli) : toujours vérifier le réseau en premier, pour
+  // ne jamais servir une version périmée — sans ça, le cache HTTP natif du navigateur peut garder
+  // une ancienne réponse pour ces URLs (elles ne changent jamais de nom), même après avoir bumpé
+  // CACHE_NAME/APP_VERSION, puisque seule la mise en cache de CE service worker en tenait compte.
   // Le cache ne sert que si le téléphone est hors ligne.
-  const isAppShell = event.request.mode === "navigate" || url.pathname.endsWith("index.html") || url.pathname.endsWith("/");
+  const isAppShell = event.request.mode === "navigate" || url.pathname.endsWith("index.html") || url.pathname.endsWith("/") || url.pathname.endsWith(".css") || url.pathname.endsWith(".js");
   if (isAppShell) {
     event.respondWith(
       fetch(event.request)
