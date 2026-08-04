@@ -29,6 +29,14 @@ function serialToDateString(serial) {
   return `${y}-${m}-${day}`;
 }
 
+// Convertit un numéro de série Sheets en "yyyy-MM-dd HH:mm" (date + heure dans
+// la même cellule) — utilisé pour la colonne Date d'Actualites, écrite en texte
+// par api_addActualite mais qu'appendRow laisse Sheets ré-interpréter en vraie
+// cellule datetime, donc renvoyée en numéro de série par UNFORMATTED_VALUE.
+function serialToDateTimeString(serial) {
+  return `${serialToDateString(Math.floor(serial))} ${serialToTimeString(serial)}`;
+}
+
 // Convertit un numéro de série Sheets (partie fractionnaire = heure du jour)
 // en "HH:mm".
 function serialToTimeString(serial) {
@@ -125,7 +133,17 @@ function api_getAll(ss, e) {
   // restreint api_getExterneClientsHistory (réservé à Ostéo/Admin) l'expose, comme pour les codes
   // PIN de "Comptes" juste au-dessus.
   const osteoReservations = result.osteoReservationsRaw.map(row => row.slice(0, 3));
+  // api_addActualite écrit sa date en TEXTE ("yyyy-MM-dd HH:mm"), mais appendRow laisse Sheets la
+  // ré-interpréter en vraie cellule datetime — UNFORMATTED_VALUE la renvoie alors en numéro de
+  // série (une actu publiée s'affichait "46238" au lieu de sa date). Même filet que pour
+  // Evenements/OsteoSlots plus haut.
+  const actualites = result.actualites.map((row, i) => {
+    if (i === 0) return row;
+    const copy = row.slice();
+    if (typeof copy[5] === "number") copy[5] = serialToDateTimeString(copy[5]);
+    return copy;
+  });
   const repasFinances = canManageRepas(callerRole) ? result.repasFinancesRaw : [];
 
-  return jsonOut({ ok: true, grid: result.grid, comptes, presences: result.presences, paiements, evenements, presenceEvenements: result.presenceEvenements, actualites: result.actualites, covoiturage: result.covoiturage, osteoSlots, osteoReservations, compositions: result.compositions, compositionsMeta: result.compositionsMeta, selections: result.selections, selectionsMeta: result.selectionsMeta, benevoles: result.benevoles, gouter: result.gouter, gouterOptions: result.gouterOptions, tableMarque: result.tableMarque, maillots: result.maillots, repasMenu: result.repasMenu, repasPrevu: result.repasPrevu, repasTarifs: result.repasTarifs, repasFinances });
+  return jsonOut({ ok: true, grid: result.grid, comptes, presences: result.presences, paiements, evenements, presenceEvenements: result.presenceEvenements, actualites, covoiturage: result.covoiturage, osteoSlots, osteoReservations, compositions: result.compositions, compositionsMeta: result.compositionsMeta, selections: result.selections, selectionsMeta: result.selectionsMeta, benevoles: result.benevoles, gouter: result.gouter, gouterOptions: result.gouterOptions, tableMarque: result.tableMarque, maillots: result.maillots, repasMenu: result.repasMenu, repasPrevu: result.repasPrevu, repasTarifs: result.repasTarifs, repasFinances });
 }

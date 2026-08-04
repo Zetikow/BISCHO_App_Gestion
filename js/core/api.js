@@ -52,16 +52,15 @@ async function fetchAll() {
   }
   // Ne reconstruit l'affichage que si les données (ou le statut en ligne/hors ligne) ont
   // réellement changé depuis le dernier rendu — la plupart des sondages toutes les 10s ne
-  // changent rien — et jamais si un formulaire est ouvert, qu'un champ/menu déroulant a
-  // actuellement le focus, ou qu'un geste tactile vient d'avoir lieu (voir isTouchRecentlyActive,
-  // core/utils.js — sinon un sondage qui tombe pile pendant un balayage remplace tout le DOM en
-  // plein geste et coupe l'inertie du scroll). Les marqueurs "__lastFetchAllRaw"/
-  // "__lastRenderedOnline" n'avancent que lors d'un rendu effectif : si un rendu est sauté, le
-  // prochain sondage retente 10s plus tard, au lieu de rester bloqué sur un affichage périmé
-  // (données ou bandeau "Hors ligne").
+  // changent rien — et jamais si un formulaire est ouvert ou qu'un champ/menu déroulant a
+  // actuellement le focus, sinon la synchro périodique se voit (saut de page) ou coupe une
+  // saisie/un menu natif en cours. Les deux marqueurs "__lastFetchAllRaw"/"__lastRenderedOnline"
+  // n'avancent que lors d'un rendu effectif : si un rendu est sauté pendant une saisie, le
+  // prochain sondage retente dès que l'utilisateur relâche le champ, au lieu de rester bloqué sur
+  // un affichage périmé (données ou bandeau "Hors ligne").
   const dataChanged = rawText !== null && rawText !== window.__lastFetchAllRaw;
   const onlineStatusChanged = isOnline !== window.__lastRenderedOnlineStatus;
-  if ((dataChanged || onlineStatusChanged) && !isFormOpen() && !isActivelyEditing() && !isTouchRecentlyActive()) {
+  if ((dataChanged || onlineStatusChanged) && !isFormOpen() && !isActivelyEditing()) {
     if (rawText !== null) window.__lastFetchAllRaw = rawText;
     window.__lastRenderedOnlineStatus = isOnline;
     render();

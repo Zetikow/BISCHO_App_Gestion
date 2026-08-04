@@ -201,10 +201,20 @@ function api_addOsteoSlot(ss, e) {
     try {
       const actualitesSheet = ss.getSheetByName("Actualites");
       const actId = "a" + Date.now();
-      const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+      // Même format que api_addActualite ("yyyy-MM-dd HH:mm") : l'ancien "dd/MM/yyyy" était
+      // ré-interprété par Sheets en vraie cellule date, donc renvoyé en numéro de série par
+      // UNFORMATTED_VALUE (batchGet) — l'actu s'affichait "46238" au lieu de sa date. Le format
+      // "@" forcé juste après empêche cette ré-interprétation à la source.
+      const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
       const titre = "Nouveau(x) créneau(x) RDV Ostéo disponible(s)";
+      const scope = equipe === "Toutes" ? "Générale" : equipe;
       const texte = "Un ou plusieurs créneaux de RDV avec Eve (ostéopathe du club) sont maintenant ouverts à la réservation" + (semaines > 1 ? (", chaque semaine sur " + semaines + " semaines") : "") + ". Rendez-vous sur la page RDV Ostéo pour réserver.";
-      actualitesSheet.appendRow([actId, titre, (equipe === "Toutes" ? "Générale" : equipe), texte, e.parameter.authNom, now]);
+      actualitesSheet.appendRow([actId, titre, scope, texte, e.parameter.authNom, now]);
+      actualitesSheet.getRange(actualitesSheet.getLastRow(), 6).setNumberFormat("@").setValue(now);
+      // Cette actu était créée directement dans la feuille, sans passer par api_addActualite —
+      // donc aucune notification push n'était envoyée, alors qu'une actu publiée normalement en
+      // déclenche une. C'est pour ça que l'ajout de créneaux ne notifiait personne.
+      notifyActualitePush(ss, titre, scope);
     } catch (err) {
       Logger.log("Erreur création actualité RDV Ostéo : " + err); // pas bloquant pour la création du créneau, mais visible dans le journal
     }

@@ -29,6 +29,10 @@ function api_addActualite(ss, e) {
   const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
   const titre = e.parameter.titre || "";
   sheet.appendRow([id, titre, scope, e.parameter.texte || "", e.parameter.authNom, dateStr]);
+  // La date est écrite en texte, mais sans ce format "@" forcé Sheets la ré-interprète en vraie
+  // cellule datetime — elle revient alors en numéro de série via UNFORMATTED_VALUE (batchGet) et
+  // s'affiche "46238" au lieu de la date. Voir aussi le filet de sécurité dans Sync.gs.
+  sheet.getRange(sheet.getLastRow(), 6).setNumberFormat("@").setValue(dateStr);
 
   notifyActualitePush(ss, titre, scope);
 

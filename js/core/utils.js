@@ -144,47 +144,6 @@ document.addEventListener("touchstart", (e) => {
   }, { passive: true });
 });
 
-// Horodatage (pas un booléen à bascule) du dernier événement tactile — voir isTouchRecentlyActive()
-// utilisé par fetchAll() (core/api.js) pour ne pas reconstruire toute la page pile pendant un
-// balayage (sinon ça coupe l'inertie du scroll, ressenti comme un "ressort"/blocage). Volontairement
-// un horodatage plutôt qu'un flag on/off : s'expire tout seul après quelques centaines de ms sans
-// contact, donc ne peut jamais rester bloqué à "actif" si un touchend venait à ne pas se déclencher
-// (contrairement à une première tentative avec un booléen, qui pouvait rester coincée).
-let __lastTouchTimestamp = 0;
-["touchstart", "touchmove"].forEach(evt => {
-  document.addEventListener(evt, () => { __lastTouchTimestamp = Date.now(); }, { passive: true });
-});
-function isTouchRecentlyActive() {
-  return (Date.now() - __lastTouchTimestamp) < 400;
-}
-
-// Suppression du rebond élastique natif (rubber-band) pile en haut/bas de page — overscroll-behavior-y:
-// contain (voir css/styles.css) n'est pas fiable en mode PWA installée sur iOS Safari : le rebond
-// peut encore se jouer et "percuter" un nouveau balayage juste après, ressenti comme un blocage
-// total du scroll pile aux extrémités (signalé sur iPhone). Ce correctif intercepte touchmove et
-// bloque UNIQUEMENT le geste qui pousserait au-delà d'une limite déjà atteinte — sans mémoire d'un
-// balayage à l'autre (__touchStartY est réinitialisé à chaque touchstart), donc ne peut jamais
-// rester "coincé" comme l'ancien __touchActive (voir isTouchRecentlyActive ci-dessus). Ignoré si le
-// doigt est posé dans une zone qui défile elle-même indépendamment de la page (fiche, tableau,
-// carrousel...) pour ne jamais casser leur propre scroll.
-const NESTED_SCROLL_SELECTOR = ".sheet-body, .table-wrap, .composition-court-col, .composition-roster-col, .osteo-carousel, .matchcard-carousel, .login-suggestions";
-let __touchStartY = 0;
-document.addEventListener("touchstart", (e) => {
-  if (e.touches && e.touches.length) __touchStartY = e.touches[0].clientY;
-}, { passive: true });
-document.addEventListener("touchmove", (e) => {
-  if (!e.touches || !e.touches.length) return;
-  if (e.target.closest && e.target.closest(NESTED_SCROLL_SELECTOR)) return;
-  const y = e.touches[0].clientY;
-  const atTop = window.scrollY <= 0;
-  const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1;
-  const draggingDown = y > __touchStartY; // le doigt descend -> pousse le contenu vers le bas -> rebond en haut
-  const draggingUp = y < __touchStartY;   // le doigt monte -> pousse le contenu vers le haut -> rebond en bas
-  if ((atTop && draggingDown) || (atBottom && draggingUp)) {
-    e.preventDefault();
-  }
-}, { passive: false });
-
 // Capture la position/taille de la carte tapée juste avant qu'un clic n'ouvre une fiche (bottom
 // sheet), pour que playSheetOpenAnimation() (core/render.js) puisse la faire "grandir" depuis
 // cet endroit plutôt que glisser depuis le bas de l'écran. Capture phase : s'exécute avant les
