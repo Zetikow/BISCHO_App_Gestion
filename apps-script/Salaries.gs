@@ -32,16 +32,45 @@ function initialiserEspaceSalaries() {
   Logger.log("Dossier de l'Espace salariés créé : " + folder.getUrl());
 }
 
-// Détecte le type d'un fichier Drive pour choisir l'icône et l'URL d'aperçu adaptées.
+const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+
+// Liste TOUT le contenu d'un dossier (sous-dossiers + fichiers) en UN SEUL appel réseau, via le
+// service avancé Drive. C'est le cœur du gain de vitesse : avec DriveApp, chaque propriété lue
+// (getDescription, getMimeType, getName, getSize, getLastUpdated...) est un aller-retour réseau
+// distinct, évalué paresseusement — un dossier de 20 fichiers déclenchait donc ~100 requêtes
+// séquentielles, d'où une navigation très lente. Ici tout arrive d'un coup grâce à "fields".
+// Même principe que le batchGet de Sync.gs pour les feuilles.
+// La boucle pageToken ne sert que pour les dossiers de plus de 1000 éléments (jamais atteint
+// en pratique ici, mais sans elle le contenu serait silencieusement tronqué).
+function driveListChildren(folderId) {
+  const out = [];
+  let pageToken = null;
+  do {
+    const res = Drive.Files.list({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: "nextPageToken, files(id, name, mimeType, size, modifiedTime, description)",
+      pageSize: 1000,
+      orderBy: "folder,name",
+      pageToken: pageToken || undefined,
+    });
+    (res.files || []).forEach(f => out.push(f));
+    pageToken = res.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
+// Détecte le type d'un fichier Drive pour choisir l'icône et l'URL d'aperçu adaptées, à partir
+// des métadonnées DÉJÀ récupérées par driveListChildren — ne déclenche aucun appel réseau
+// supplémentaire (contrairement à l'ancienne version qui recevait un objet File paresseux).
 // Un "lien externe" est représenté par un petit fichier texte dont la description
 // commence par LUSTUZONE_LINK:: — pas besoin de feuille séparée pour les stocker.
-function driveFileTypeInfo(file) {
-  const desc = file.getDescription() || "";
+function driveFileTypeInfo(meta) {
+  const desc = meta.description || "";
   if (desc.indexOf("LUSTUZONE_LINK::") === 0) {
     return { iconType: "link", isLink: true, linkUrl: desc.substring("LUSTUZONE_LINK::".length), previewUrl: null, imageUrl: null, viewUrl: null };
   }
-  const mime = file.getMimeType();
-  const id = file.getId();
+  const mime = meta.mimeType || "";
+  const id = meta.id;
   let iconType = "file";
   let previewUrl = `https://drive.google.com/file/d/${id}/preview`;
   let imageUrl = null;
@@ -66,10 +95,13 @@ function driveFileTypeInfo(file) {
   return { iconType, isLink: false, linkUrl: null, previewUrl, imageUrl, viewUrl };
 }
 
+// L'API Drive renvoie "size" en TEXTE (entier 64 bits), et pas du tout pour les fichiers
+// natifs Google (Docs/Sheets/Slides) — d'où la conversion et le "" plutôt qu'un "0 Ko" trompeur.
 function formatBytes(bytes) {
-  if (!bytes) return "0 Ko";
-  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " Ko";
-  return (bytes / (1024 * 1024)).toFixed(1) + " Mo";
+  const n = Number(bytes);
+  if (!n || isNaN(n)) return "";
+  if (n < 1024 * 1024) return Math.round(n / 1024) + " Ko";
+  return (n / (1024 * 1024)).toFixed(1) + " Mo";
 }
 
 // ===================== ACTIONS API =====================
@@ -78,41 +110,46 @@ function api_salariesList(ss, e) {
   const role = checkSalarieAuth(ss, e.parameter.authNom, e.parameter.authCode);
   if (!role) return jsonOut({ ok: false, error: "forbidden" });
   const root = getSalariesRootFolder();
-  const folderId = e.parameter.folderId || root.getId();
-  let folder;
-  try { folder = DriveApp.getFolderById(folderId); } catch (err) { return jsonOut({ ok: false, error: "not_found" }); }
+  const rootId = root.getId();
+  const folderId = e.parameter.folderId || rootId;
 
-  const folders = [];
-  const fIter = folder.getFolders();
-  while (fIter.hasNext()) {
-    const f = fIter.next();
-    folders.push({ id: f.getId(), name: f.getName() });
+  // Nom du dossier courant : un seul appel ciblé (sert aussi à vérifier qu'il existe encore).
+  let currentName = "Racine";
+  if (folderId !== rootId) {
+    try {
+      currentName = Drive.Files.get(folderId, { fields: "id, name" }).name;
+    } catch (err) {
+      return jsonOut({ ok: false, error: "not_found" });
+    }
   }
 
-  // Note perf : on évite getOwner() (un des appels DriveApp les plus lents) et on ne
-  // recalcule plus le fil d'Ariane côté serveur (l'appli le suit elle-même côté client) —
-  // ça évite plusieurs allers-retours Drive à chaque navigation.
+  // UN SEUL appel réseau pour tout le contenu du dossier (voir driveListChildren), au lieu des
+  // ~5 requêtes PAR FICHIER de l'ancienne version basée sur DriveApp. On sépare ensuite
+  // sous-dossiers et fichiers sur le type MIME, sans aucun aller-retour supplémentaire.
+  const children = driveListChildren(folderId);
+  const folders = [];
   const files = [];
-  const fileIter = folder.getFiles();
-  while (fileIter.hasNext()) {
-    const file = fileIter.next();
-    const info = driveFileTypeInfo(file);
+  children.forEach(meta => {
+    if (meta.mimeType === DRIVE_FOLDER_MIME) {
+      folders.push({ id: meta.id, name: meta.name });
+      return;
+    }
+    const info = driveFileTypeInfo(meta);
     files.push({
-      id: file.getId(),
-      name: info.isLink ? file.getName().replace(/\.url$/, "") : file.getName(),
+      id: meta.id,
+      name: info.isLink ? String(meta.name || "").replace(/\.url$/, "") : meta.name,
       iconType: info.iconType,
       isLink: info.isLink,
       linkUrl: info.linkUrl,
       previewUrl: info.previewUrl,
       imageUrl: info.imageUrl,
       viewUrl: info.viewUrl,
-      sizeLabel: info.isLink ? "" : formatBytes(file.getSize()),
-      date: Utilities.formatDate(file.getLastUpdated(), Session.getScriptTimeZone(), "dd/MM/yyyy"),
+      sizeLabel: info.isLink ? "" : formatBytes(meta.size),
+      date: meta.modifiedTime ? Utilities.formatDate(new Date(meta.modifiedTime), Session.getScriptTimeZone(), "dd/MM/yyyy") : "",
     });
-  }
+  });
 
-  return jsonOut({ ok: true, currentFolder: { id: folder.getId(), name: folder.getId() === root.getId() ? "Racine" : folder.getName() },
-    folders, files });
+  return jsonOut({ ok: true, currentFolder: { id: folderId, name: currentName }, folders, files });
 }
 
 function api_salariesCreateFolder(ss, e) {
