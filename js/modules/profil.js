@@ -43,7 +43,7 @@ function renderPosteCard(postes, unwrapped) {
       <button class="btn secondary poste-inline-btn" id="profil-poste-add-submit">Ajouter</button>
     </div>`;
   } else if (remaining.length > 0) {
-    html += `<button class="add-toggle" id="profil-poste-add-toggle" style="margin-top:4px;">+ Ajouter un poste</button>`;
+    html += `<button class="add-toggle compact" id="profil-poste-add-toggle" style="margin-top:4px;">+ Ajouter</button>`;
   }
 
   if (unwrapped) return html;
