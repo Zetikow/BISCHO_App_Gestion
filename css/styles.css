@@ -19,7 +19,15 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 @keyframes cardCascadeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes navIconBounce { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
-html, body { margin: 0; padding: 0; background: #07080d; overflow-x: hidden; }
+/* overflow-x: hidden UNIQUEMENT sur html, jamais aussi sur body. En CSS, dès qu'un axe vaut
+   "hidden", l'autre passe automatiquement de "visible" à "auto" : mettre overflow-x sur body en
+   faisait donc un CONTENEUR DE DÉFILEMENT à part entière, en plus de celui de la page. Avec le
+   débordement de body::before (voir plus bas), ça donnait littéralement DEUX barres de défilement
+   côte à côte sur ordinateur — et sur mobile, ce second conteneur captait le geste tactile aux
+   extrémités de la page, ce qui bloquait le défilement. html seul suffit à empêcher tout
+   débordement horizontal. */
+html { overflow-x: hidden; }
+html, body { margin: 0; padding: 0; background: #07080d; }
 body {
   position: relative;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -44,8 +52,13 @@ body::before {
   position: absolute;
   /* Le flou (9px) déborde visuellement d'environ 3x son rayon (~27px) : avec seulement -14px de
      débord, ce halo de flou n'avait pas assez d'image en dehors des bords pour se fondre et
-     ressortait comme une brume plus prononcée sur les côtés. -40px laisse la marge nécessaire. */
-  top: -40px; left: -40px; right: -40px; bottom: -40px;
+     ressortait comme une brume plus prononcée sur les côtés. -40px laisse la marge nécessaire.
+     EXCEPTION en bas : bottom reste à 0. Un débordement vers le BAS agrandit la zone défilable de
+     la page (contrairement à un débordement vers le haut ou la gauche, qui ne crée jamais de
+     défilement) — les -40px d'origine ajoutaient donc 40px de vide défilable en fin de page, ce
+     qui alimentait la seconde barre de défilement. Le flou y perd son fondu, mais seulement tout
+     en bas, sous les 92px de marge réservés au menu flottant : invisible en pratique. */
+  top: -40px; left: -40px; right: -40px; bottom: 0;
   z-index: -1;
   /* 2 couches : le dégradé de contraste (jamais répété, sinon il recommence plus clair à chaque
      tuile et ça crée une ligne visible) + la photo qui, elle, se répète verticalement (repeat-y). */
