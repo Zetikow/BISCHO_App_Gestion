@@ -211,16 +211,41 @@ function api_addOsteoSlot(ss, e) {
       const texte = "Un ou plusieurs créneaux de RDV avec Eve (ostéopathe du club) sont maintenant ouverts à la réservation" + (semaines > 1 ? (", chaque semaine sur " + semaines + " semaines") : "") + ". Rendez-vous sur la page RDV Ostéo pour réserver.";
       actualitesSheet.appendRow([actId, titre, scope, texte, e.parameter.authNom, now]);
       actualitesSheet.getRange(actualitesSheet.getLastRow(), 6).setNumberFormat("@").setValue(now);
-      // Cette actu était créée directement dans la feuille, sans passer par api_addActualite —
-      // donc aucune notification push n'était envoyée, alors qu'une actu publiée normalement en
-      // déclenche une. C'est pour ça que l'ajout de créneaux ne notifiait personne.
-      notifyActualitePush(ss, titre, scope);
     } catch (err) {
       Logger.log("Erreur création actualité RDV Ostéo : " + err); // pas bloquant pour la création du créneau, mais visible dans le journal
     }
   }
 
+  // Notification envoyée à CHAQUE création de créneau, indépendamment de la case "publier une
+  // actualité" — c'est l'ouverture des créneaux qui intéresse les gens, pas le fait qu'une actu
+  // accompagne ou non. Une seule notification par création (jamais deux même si l'actu est
+  // publiée), ciblée selon l'équipe du créneau : "Toutes" = tout le club, sinon uniquement
+  // l'équipe concernée.
+  notifyOsteoSlotsPush(ss, equipe, createdIds.length);
+
   return jsonOut({ ok: true, ids: createdIds });
+}
+
+// Cible exactement comme la visibilité des créneaux : "Toutes" touche tout le monde ayant un
+// jeton ; une équipe précise touche ses Joueur/Coach et les parents de ses joueurs, PLUS
+// Admin/Salarié/Ostéo qui voient tout quelle que soit leur équipe (même règle que
+// notifyActualitePush dans Actualites.gs). Jamais bloquant pour la création du créneau.
+function notifyOsteoSlotsPush(ss, equipe, count) {
+  try {
+    const quoi = count > 1 ? `${count} nouveaux créneaux sont ouverts` : "Un nouveau créneau est ouvert";
+    const body = `${quoi} à la réservation avec Eve, ostéopathe du club.`;
+    let tokens;
+    if (equipe === "Toutes") {
+      tokens = pushTokensAll(ss);
+    } else {
+      const teamTokens = pushTokensForEquipe(ss, equipe, ["Joueur", "Coach"], true);
+      const broadTokens = [].concat(pushTokensForRole(ss, "Admin"), pushTokensForRole(ss, "Salarié"), pushTokensForRole(ss, "Ostéo"));
+      tokens = Array.from(new Set(teamTokens.concat(broadTokens)));
+    }
+    tokens.forEach(token => sendPushNotification(token, "🦴 Créneaux RDV Ostéo", body));
+  } catch (err) {
+    Logger.log("Erreur notif push nouveaux créneaux Ostéo : " + err);
+  }
 }
 
 // Réserve un créneau — pour soi-même, ou pour quelqu'un d'autre si Admin/Ostéo (utile en cas
