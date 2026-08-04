@@ -603,7 +603,7 @@ function render() {
   const tableScrollTop = tableWrap ? tableWrap.scrollTop : 0;
 
   // Mémorise les valeurs des champs en cours de saisie (formulaires) pour ne pas
-  // les effacer lors du rafraîchissement automatique toutes les 8 secondes
+  // les effacer lors du rafraîchissement automatique périodique
   const fieldValues = {};
   app.querySelectorAll("input[id], select[id], textarea[id]").forEach(el => {
     if (el.id === "nav-extra") return; // contrôle de navigation, jamais à restaurer
@@ -675,7 +675,7 @@ function render() {
 
   // Exposé avant le rendu de la page : permet aux renderXxxPage() de ne jouer une animation
   // d'entrée (cascade de cartes, barres qui se remplissent...) que lors d'un vrai changement de
-  // page, jamais lors d'un rafraîchissement périodique (fetchAll toutes les 8-10s) qui rejoue
+  // page, jamais lors d'un rafraîchissement périodique (fetchAll périodique) qui rejoue
   // sinon l'animation en boucle sur des données identiques.
   window.__pageJustChanged = session && (__lastRenderedPage === null || __lastRenderedPage !== currentPage);
 

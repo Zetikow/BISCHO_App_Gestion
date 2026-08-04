@@ -845,7 +845,7 @@ function renderEventCard(ev, canManage, isPast, staggerIndex) {
   }
 
   // Cascade d'entrée uniquement lors d'un vrai changement de page (window.__pageJustChanged,
-  // voir render.js) — sinon le rafraîchissement périodique (fetchAll toutes les 8-10s) rejouerait
+  // voir render.js) — sinon le rafraîchissement périodique (fetchAll périodique) rejouerait
   // l'animation en boucle sur des cartes identiques.
   const cascadeStyle = (!isPast && window.__pageJustChanged && typeof staggerIndex === "number")
     ? `animation:cardCascadeIn 0.35s ease-out forwards; animation-delay:${Math.min(staggerIndex * 0.06, 0.6)}s;`

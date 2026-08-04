@@ -10,7 +10,7 @@
 // document.body et suivi à la souris/au doigt via des styles manipulés
 // à la main, jusqu'au relâchement — seul le résultat final déclenche un
 // render() classique via l'appel API. window.__compositionDragActive
-// bloque aussi le rafraîchissement périodique (fetchAll toutes les 10s)
+// bloque aussi le rafraîchissement périodique (fetchAll périodique)
 // pendant le geste, voir isFormOpen() dans state.js.
 // ===================================================================
 
